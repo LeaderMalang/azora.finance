@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "howItWorks": "Cómo Funciona la IA",
+    "calculator": "Calculadora",
+    "referrals": "Referidos",
+    "faq": "Preguntas",
+    "launchApp": "Abrir App"
+  },
+  "hero": {
+    "eyebrow": "BNB Smart Chain · Ejecución Impulsada por IA",
+    "headline": "Staking AZR.\nImpulsado por IA.",
+    "sub": "La IA ejecuta cada operación, monitorea cada staking y distribuye cada recompensa — automáticamente, las 24 horas. Tú ganas 0.7% diario mientras la IA hace el resto.",
+    "cta1": "Comenzar a Ganar",
+    "cta2": "Ver Cómo Funciona la IA",
+    "trust1": "Monitor de Seguridad IA",
+    "trust2": "Contratos Ejecutados por IA",
+    "trust3": "Suministro Fijo 100B"
+  },
+  "stats": {
+    "tvl": "TVL Gestionado por IA",
+    "stakers": "Stakers Activos",
+    "daily": "Rendimiento Diario Optimizado por IA",
+    "rewards": "Recompensas Distribuidas por IA"
+  },
+  "howItWorks": {
+    "title": "Cómo Funciona la IA",
+    "sub": "Tres fases. Cero intervención manual.",
+    "step1Title": "Conectar y Verificar",
+    "step1Desc": "Conecta tu wallet BSC. La IA verifica tu identidad al instante y te asigna un identificador único .azr.",
+    "step2Title": "IA Ejecuta tu Swap y Staking",
+    "step2Desc": "La IA procesa tu conversión USDT-a-AZR a una tasa de reserva justa y hace staking de tus tokens — todo en un flujo coordinado.",
+    "step3Title": "IA Te Monitorea y Paga",
+    "step3Desc": "La IA rastrea tu posición por segundo, acumula recompensas al 0.7% diario y liquida claims y comisiones de referidos al instante."
+  },
+  "calculator": {
+    "title": "Proyector de Rendimiento IA",
+    "sub": "Mira exactamente lo que la IA ganará para ti al 0.7% diario — sin suposiciones.",
+    "label": "Monto en staking (AZR)",
+    "daily": "Diario",
+    "monthly": "Mensual",
+    "lock": "150 Días",
+    "apr": "APR Simple"
+  },
+  "features": {
+    "title": "Plataforma Impulsada por IA",
+    "sub": "Seis formas en que el motor de IA de Azora trabaja para ti, 24/7.",
+    "f1Title": "Guardia de Seguridad IA",
+    "f1Desc": "La IA monitorea cada interacción on-chain en tiempo real — detectando anomalías y protegiendo tus activos automáticamente.",
+    "f2Title": "Motor de Referidos IA",
+    "f2Desc": "La IA rastrea cadenas de 3 niveles al instante y distribuye comisiones del 5% / 3% / 2% en el momento en que se confirma un staking.",
+    "f3Title": "Revisión de Retiros IA",
+    "f3Desc": "La IA pre-filtra cada solicitud de retiro antes de la confirmación del admin, añadiendo una capa inteligente de detección de fraudes.",
+    "f4Title": "IA Universal de Wallets",
+    "f4Desc": "La IA conecta MetaMask, Trust Wallet, WalletConnect y Coinbase — compatible con cualquier wallet.",
+    "f5Title": "Transparencia de Suministro IA",
+    "f5Desc": "La IA rastrea el suministro fijo de 100B AZR on-chain en tiempo real — sin acuñación oculta, totalmente transparente.",
+    "f6Title": "Acumulación IA por Segundo",
+    "f6Desc": "Las recompensas son calculadas por segundo por la IA. Reclama en cualquier momento — tu saldo se actualiza en vivo."
+  },
+  "referral": {
+    "title": "Red de Referidos IA",
+    "sub": "La IA rastrea tu cadena de referidos automáticamente. Cada vez que alguien en tu red hace staking, la IA calcula y paga tu comisión al instante.",
+    "l1": "Nivel 1 — Referido directo",
+    "l2": "Nivel 2 — Referido de tu referido",
+    "l3": "Nivel 3 — Tres niveles",
+    "you": "Tú"
+  },
+  "faq": {
+    "title": "Preguntas sobre la IA, respondidas.",
+    "q1": "¿Qué es AZR y cómo lo usa la IA?",
+    "a1": "AZR es el token nativo del protocolo de staking impulsado por IA de Azora en BNB Smart Chain. Con suministro fijo de 100 mil millones, la IA lo usa para pagar recompensas y comisiones. No es una stablecoin — su valor fluctúa según el mercado.",
+    "q2": "¿Cómo calcula la IA mi recompensa diaria del 0.7%?",
+    "a2": "El motor de IA acumula recompensas por segundo: pendingRewards = staked × 0.007 × (segundosTranscurridos / 86400). No son compuestas — calculadas sobre el principal original y liquidadas al momento del claim.",
+    "q3": "¿Qué hace la IA durante mis 150 días de bloqueo?",
+    "a3": "La IA monitorea tu staking 24/7, acumulando recompensas cada segundo. Puedes reclamar recompensas en cualquier momento. El retiro del principal solo está disponible después de 150 días — la IA lo hace cumplir automáticamente.",
+    "q4": "¿Cómo gestiona la IA mis comisiones de referidos?",
+    "a4": "Cuando alguien hace staking con tu enlace, la IA rastrea la cadena de 3 niveles y distribuye: 5% para ti (L1), 3% a tu referidor (L2), 2% al siguiente nivel (L3). Pagado del pool de recompensas en tiempo real.",
+    "q5": "¿Cómo protege la IA mi retiro?",
+    "a5": "Cada solicitud de retiro es pre-filtrada por la IA antes de entrar en la cola de revisión del admin. La IA detecta patrones sospechosos y garantiza que solo avancen solicitudes legítimas.",
+    "q6": "¿Cómo obtengo AZR para hacer staking?",
+    "a6": "Usa el Swap impulsado por IA dentro de la app Azora para convertir USDT en AZR a tasa 1:1. La IA ejecuta el swap e inicia tu staking en un flujo continuo. Más listados seguirán tras el listado público."
+  },
+  "cta": {
+    "title": "Deja que la IA gane por ti.",
+    "sub": "Miles de stakers ya ganan 0.7% diario mientras la IA gestiona cada ejecución.",
+    "btn": "Comenzar a Ganar"
+  },
+  "footer": {
+    "tagline": "Staking impulsado por IA. 0.7% cada día.",
+    "disclaimer": "AZR no es una stablecoin. Su valor fluctúa según el mercado. El staking implica riesgos. Esto no es asesoramiento financiero. Siempre investiga por tu cuenta.",
+    "links": "Enlaces Rápidos",
+    "community": "Comunidad",
+    "contract": "Contrato",
+    "bscScan": "BscScan",
+    "rights": "© 2025 Azora. Todos los derechos reservados."
+  },
+  "app": {
+    "dashboard": "Panel",
+    "swap": "Swap",
+    "stake": "Staking",
+    "referrals": "Referidos",
+    "withdrawals": "Retiros",
+    "disconnect": "Desconectar",
+    "network": "BNB Smart Chain",
+    "connect": "Conectar Wallet"
+  },
+  "connect": {
+    "title": "Conectar Wallet",
+    "sub": "Elige tu wallet preferida para comenzar.",
+    "registerTitle": "Reclama Tu Usuario",
+    "registerSub": "Crea tu identidad única username.azr en Azora.",
+    "usernamePlaceholder": "tunombre (se convierte en tunombre.azr)",
+    "referralPlaceholder": "Usuario referidor (opcional)",
+    "register": "Registrar y Entrar",
+    "registering": "Registrando..."
+  },
+  "dashboard": {
+    "title": "Panel",
+    "portfolio": "Valor del Portafolio",
+    "totalStaked": "Total en Staking",
+    "claimable": "Recompensas Reclamables",
+    "referralEarnings": "Ganancias de Referidos",
+    "activeStakes": "Stakings Activos",
+    "claimAll": "Reclamar Todas",
+    "claiming": "Reclamando...",
+    "noStakes": "Sin stakings activos aún.",
+    "goStake": "Comenzar Staking"
+  },
+  "swap": {
+    "title": "Swap",
+    "sub": "Intercambia USDT ↔ AZR a tasa de reserva 1:1.",
+    "balance": "Balance",
+    "max": "MÁX",
+    "swapBtn": "Swap",
+    "swapping": "Intercambiando...",
+    "rateNote": "1 USDT = 1 AZR (tasa de reserva)"
+  },
+  "staking": {
+    "title": "Staking",
+    "amount": "Monto a Stakear",
+    "minStake": "Mín. staking",
+    "lockPeriod": "Período de bloqueo",
+    "daily": "Recompensa diaria",
+    "estDaily": "Ganancias diarias est.",
+    "stakeBtn": "Stakear AZR",
+    "staking": "Stakeando...",
+    "claim": "Reclamar",
+    "unstake": "Retirar",
+    "lockedUntil": "Bloqueado hasta",
+    "pending": "Pendiente"
+  },
+  "referralsPage": {
+    "title": "Referidos",
+    "yourLink": "Tu Enlace de Referido",
+    "copy": "Copiar",
+    "copied": "¡Copiado!",
+    "l1Earnings": "Ganancias N1",
+    "l2Earnings": "Ganancias N2",
+    "l3Earnings": "Ganancias N3",
+    "history": "Historial de Comisiones",
+    "noEarnings": "Sin ganancias de referidos aún.",
+    "shareLink": "Comparte tu enlace para comenzar a ganar comisiones."
+  },
+  "withdrawalsPage": {
+    "title": "Retiros",
+    "request": "Solicitar Retiro",
+    "asset": "Activo",
+    "amount": "Monto",
+    "fee": "Comisión de retiro",
+    "youGet": "Recibes",
+    "submit": "Enviar Solicitud",
+    "submitting": "Enviando...",
+    "queue": "Cola de Retiros",
+    "noRequests": "Sin solicitudes de retiro aún.",
+    "statusPending": "Pendiente",
+    "statusApproved": "Aprobado",
+    "statusRejected": "Rechazado"
+  }
+}

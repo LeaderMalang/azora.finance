@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "howItWorks": "AI 如何运作",
+    "calculator": "收益计算",
+    "referrals": "推荐计划",
+    "faq": "常见问题",
+    "launchApp": "启动应用"
+  },
+  "hero": {
+    "eyebrow": "BNB 智能链 · AI 驱动执行",
+    "headline": "质押 AZR。\nAI 驱动。",
+    "sub": "AI 执行每一笔交易、监控每一笔质押、分发每一笔奖励 — 全自动，全天候。您每日赚取 0.7%，AI 负责其余一切。",
+    "cta1": "开始赚取",
+    "cta2": "了解 AI 运作方式",
+    "trust1": "AI 安全监控",
+    "trust2": "AI 执行合约",
+    "trust3": "1000亿固定供应量"
+  },
+  "stats": {
+    "tvl": "AI 管理的总锁仓量",
+    "stakers": "活跃质押者",
+    "daily": "AI 优化每日收益率",
+    "rewards": "AI 分发的奖励"
+  },
+  "howItWorks": {
+    "title": "AI 如何运作",
+    "sub": "三个阶段，零人工干预。",
+    "step1Title": "连接并验证",
+    "step1Desc": "连接您的 BSC 钱包。AI 即时验证您的身份并为您分配专属 .azr 标识符。",
+    "step2Title": "AI 执行兑换与质押",
+    "step2Desc": "AI 以公平储备汇率处理您的 USDT-to-AZR 兑换并质押您的代币 — 一气呵成。",
+    "step3Title": "AI 监控并为您支付",
+    "step3Desc": "AI 每秒追踪您的持仓，累积 0.7% 每日奖励，并即时结算领取和推荐佣金。"
+  },
+  "calculator": {
+    "title": "AI 收益预测器",
+    "sub": "精确查看 AI 将以 0.7% 每日收益为您赚取多少 — 无需猜测。",
+    "label": "质押数量（AZR）",
+    "daily": "每日",
+    "monthly": "每月",
+    "lock": "150天",
+    "apr": "简单年化"
+  },
+  "features": {
+    "title": "AI 驱动平台",
+    "sub": "Azora 的 AI 引擎为您全天候工作的六种方式。",
+    "f1Title": "AI 安全卫士",
+    "f1Desc": "AI 实时监控每一次链上交互 — 自动检测异常并保护您的质押资产。",
+    "f2Title": "AI 推荐引擎",
+    "f2Desc": "AI 即时追踪 3 级推荐链，在质押确认的瞬间分发 5% / 3% / 2% 佣金。",
+    "f3Title": "AI 提款审核",
+    "f3Desc": "每笔提款请求在管理员确认前经 AI 预筛选，增加智能欺诈检测层。",
+    "f4Title": "通用钱包 AI",
+    "f4Desc": "AI 桥接 MetaMask、Trust Wallet、WalletConnect 和 Coinbase — 无缝连接任意钱包。",
+    "f5Title": "AI 供应透明度",
+    "f5Desc": "AI 实时追踪链上固定的 1000亿 AZR 供应量 — 无隐性增发，完全透明。",
+    "f6Title": "AI 按秒计息",
+    "f6Desc": "AI 每秒计算奖励。随时领取 — 余额实时更新。"
+  },
+  "referral": {
+    "title": "AI 推荐网络",
+    "sub": "AI 自动追踪您的推荐链。每当您网络中有人质押，AI 即时计算并支付您的佣金。",
+    "l1": "第1级 — 直接推荐",
+    "l2": "第2级 — 推荐人的推荐人",
+    "l3": "第3级 — 三层关系",
+    "you": "您"
+  },
+  "faq": {
+    "title": "关于 AI 的问题，已解答。",
+    "q1": "AZR 是什么，AI 如何使用它？",
+    "a1": "AZR 是 Azora AI 驱动质押协议在 BNB 智能链上的原生代币，固定供应量 1000亿枚。AI 引擎使用 AZR 支付奖励和推荐佣金。AZR 不是稳定币 — 其价值随市场条件波动。",
+    "q2": "AI 如何计算我的 0.7% 每日奖励？",
+    "a2": "AI 引擎按秒累积奖励：待领奖励 = 质押量 × 0.007 × (已过秒数 / 86400)。非复利，基于原始质押本金计算，领取时即时结算。",
+    "q3": "150 天锁仓期间 AI 做什么？",
+    "a3": "AI 全天候监控您的质押，每秒累积奖励。锁仓期间可随时领取奖励。本金解质押仅在 150 天后可用 — AI 通过智能合约自动执行。",
+    "q4": "AI 如何处理我的推荐佣金？",
+    "a4": "当有人通过您的推荐链接质押时，AI 即时追踪 3 级链并分发：您获得 5%（L1），您的推荐人获得 3%（L2），下一级获得 2%（L3）。实时从奖励池支付。",
+    "q5": "AI 如何保护我的提款？",
+    "a5": "每笔提款请求在进入管理员审核队列前由 AI 预筛选。AI 标记可疑模式，确保只有合法请求通过 — 在智能合约上增加智能安全层。",
+    "q6": "如何获得 AZR 进行质押？",
+    "a6": "在 Azora 应用内使用 AI 驱动的 Swap，以 1:1 储备汇率将 USDT 兑换为 AZR。AI 执行兑换并无缝发起质押。代币公开上市后将有更多交易所上线。"
+  },
+  "cta": {
+    "title": "让 AI 为您赚取。",
+    "sub": "数千名质押者已在 AI 处理每笔执行的同时，每日赚取 0.7%。",
+    "btn": "开始赚取"
+  },
+  "footer": {
+    "tagline": "AI 驱动质押。每天 0.7%。",
+    "disclaimer": "AZR 不是稳定币。其价值随市场条件波动。质押涉及风险，这不构成投资建议。请进行充分的自我研究。",
+    "links": "快速链接",
+    "community": "社区",
+    "contract": "合约",
+    "bscScan": "BscScan",
+    "rights": "© 2025 Azora. 保留所有权利。"
+  },
+  "app": {
+    "dashboard": "仪表板",
+    "swap": "兑换",
+    "stake": "质押",
+    "referrals": "推荐",
+    "withdrawals": "提款",
+    "disconnect": "断开连接",
+    "network": "BNB 智能链",
+    "connect": "连接钱包"
+  },
+  "connect": {
+    "title": "连接钱包",
+    "sub": "选择您偏好的钱包开始使用。",
+    "registerTitle": "注册用户名",
+    "registerSub": "在 Azora 创建您的专属 username.azr 身份。",
+    "usernamePlaceholder": "用户名（将成为 用户名.azr）",
+    "referralPlaceholder": "推荐人用户名（可选）",
+    "register": "注册并进入应用",
+    "registering": "注册中..."
+  },
+  "dashboard": {
+    "title": "仪表板",
+    "portfolio": "投资组合价值",
+    "totalStaked": "总质押量",
+    "claimable": "可领取奖励",
+    "referralEarnings": "推荐收益",
+    "activeStakes": "活跃质押",
+    "claimAll": "领取全部奖励",
+    "claiming": "领取中...",
+    "noStakes": "暂无活跃质押。",
+    "goStake": "开始质押"
+  },
+  "swap": {
+    "title": "兑换",
+    "sub": "以 1:1 储备汇率兑换 USDT ↔ AZR。",
+    "balance": "余额",
+    "max": "最大",
+    "swapBtn": "兑换",
+    "swapping": "兑换中...",
+    "rateNote": "1 USDT = 1 AZR（储备汇率）"
+  },
+  "staking": {
+    "title": "质押",
+    "amount": "质押数量",
+    "minStake": "最低质押",
+    "lockPeriod": "锁仓期",
+    "daily": "每日收益",
+    "estDaily": "预估每日收益",
+    "stakeBtn": "质押 AZR",
+    "staking": "质押中...",
+    "claim": "领取",
+    "unstake": "解除质押",
+    "lockedUntil": "锁定至",
+    "pending": "待领取"
+  },
+  "referralsPage": {
+    "title": "推荐",
+    "yourLink": "您的推荐链接",
+    "copy": "复制",
+    "copied": "已复制！",
+    "l1Earnings": "第1级收益",
+    "l2Earnings": "第2级收益",
+    "l3Earnings": "第3级收益",
+    "history": "佣金历史",
+    "noEarnings": "暂无推荐收益。",
+    "shareLink": "分享您的链接开始赚取佣金。"
+  },
+  "withdrawalsPage": {
+    "title": "提款",
+    "request": "申请提款",
+    "asset": "资产",
+    "amount": "数量",
+    "fee": "提款费",
+    "youGet": "您将收到",
+    "submit": "提交申请",
+    "submitting": "提交中...",
+    "queue": "提款队列",
+    "noRequests": "暂无提款申请。",
+    "statusPending": "待审核",
+    "statusApproved": "已批准",
+    "statusRejected": "已拒绝"
+  }
+}

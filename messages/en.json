@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "howItWorks": "How AI Works",
+    "calculator": "Calculator",
+    "referrals": "Referrals",
+    "faq": "FAQ",
+    "launchApp": "Launch App"
+  },
+  "hero": {
+    "eyebrow": "BNB Smart Chain · AI-Powered Execution",
+    "headline": "Stake AZR.\nPowered by AI.",
+    "sub": "AI executes every trade, monitors every stake, and distributes every reward — automatically, around the clock. You earn 0.7% daily while the AI handles the rest.",
+    "cta1": "Start Earning",
+    "cta2": "See How AI Works",
+    "trust1": "AI Security Monitor",
+    "trust2": "AI-Executed Contracts",
+    "trust3": "100B Fixed Supply"
+  },
+  "stats": {
+    "tvl": "AI-Managed TVL",
+    "stakers": "Active Stakers",
+    "daily": "AI-Optimized Daily Yield",
+    "rewards": "AI-Distributed Rewards"
+  },
+  "howItWorks": {
+    "title": "How the AI Works",
+    "sub": "Three phases. Zero manual intervention.",
+    "step1Title": "Connect & Verify",
+    "step1Desc": "Connect your BSC wallet. AI instantly verifies your identity and assigns a unique .azr handle to your account.",
+    "step2Title": "AI Executes Your Swap & Stake",
+    "step2Desc": "AI processes your USDT-to-AZR conversion at a fair reserve rate and stakes your tokens — all in a single coordinated flow.",
+    "step3Title": "AI Monitors & Pays You",
+    "step3Desc": "AI tracks your position per second, accrues 0.7% daily rewards, and settles claims and referral commissions instantly."
+  },
+  "calculator": {
+    "title": "AI Yield Projector",
+    "sub": "See exactly what AI will earn for you at 0.7% daily — no guesswork.",
+    "label": "Stake amount (AZR)",
+    "daily": "Daily",
+    "monthly": "Monthly",
+    "lock": "150-Day",
+    "apr": "Simple APR"
+  },
+  "features": {
+    "title": "AI-Powered Platform",
+    "sub": "Six ways Azora's AI engine works for you, 24/7.",
+    "f1Title": "AI Security Guard",
+    "f1Desc": "AI monitors every on-chain interaction in real time — detecting anomalies and protecting your staked assets automatically.",
+    "f2Title": "AI Referral Engine",
+    "f2Desc": "AI instantly traces 3-level referral chains and distributes 5% / 3% / 2% commissions the moment a stake is confirmed.",
+    "f3Title": "AI Withdrawal Review",
+    "f3Desc": "AI pre-screens every withdrawal request before admin confirmation, adding a smart layer of fraud detection.",
+    "f4Title": "Universal Wallet AI",
+    "f4Desc": "AI bridges MetaMask, Trust Wallet, WalletConnect, and Coinbase — connecting from any wallet seamlessly.",
+    "f5Title": "AI Supply Transparency",
+    "f5Desc": "AI tracks the entire fixed 100B AZR supply on-chain in real time — no hidden minting, fully transparent.",
+    "f6Title": "Per-Second AI Accrual",
+    "f6Desc": "Rewards are calculated per second by AI. Claim at any moment — your balance updates live."
+  },
+  "referral": {
+    "title": "AI Referral Network",
+    "sub": "AI traces your referral chain automatically. Every time someone in your network stakes, AI calculates and pays your commission instantly.",
+    "l1": "Level 1 — Direct referral",
+    "l2": "Level 2 — Your referral's referral",
+    "l3": "Level 3 — Three hops down",
+    "you": "You"
+  },
+  "faq": {
+    "title": "Questions about the AI, answered.",
+    "q1": "What is AZR and how does AI use it?",
+    "a1": "AZR is the native token of the Azora AI-powered staking protocol on BNB Smart Chain. Fixed at 100 billion tokens, AZR is used by the AI engine to pay rewards and referral commissions. It is not a stablecoin — its value fluctuates with market conditions.",
+    "q2": "How does AI calculate my 0.7% daily reward?",
+    "a2": "The AI engine accrues rewards per second: pendingRewards = staked × 0.007 × (elapsedSeconds / 86400). Rewards are non-compounding, calculated on your original staked principal and settled the moment you claim.",
+    "q3": "What does AI do during my 150-day lock?",
+    "a3": "AI monitors your stake 24/7, accruing rewards every second. You can claim rewards at any time during the lock. Unstaking the principal is only available after 150 days — AI enforces this automatically via the smart contract.",
+    "q4": "How does AI handle my referral commissions?",
+    "a4": "When someone stakes using your referral link, AI instantly traces the 3-level chain and distributes commissions: 5% to you (L1), 3% to your referrer (L2), 2% to the next level (L3). Paid from the reward pool in real time.",
+    "q5": "How does AI protect my withdrawal?",
+    "a5": "Every withdrawal request is pre-screened by AI before entering the admin review queue. AI flags suspicious patterns and ensures only legitimate requests proceed — adding a smart security layer over the smart contract.",
+    "q6": "How do I get AZR to stake?",
+    "a6": "Use the AI-powered Swap inside the Azora app to convert USDT to AZR at a 1:1 reserve rate. The AI executes the swap and initiates your stake in a seamless flow. More exchange listings will follow after public listing."
+  },
+  "cta": {
+    "title": "Let AI earn for you.",
+    "sub": "Thousands of stakers are already earning 0.7% daily while AI handles every execution.",
+    "btn": "Start Earning"
+  },
+  "footer": {
+    "tagline": "AI-powered staking. 0.7% every day.",
+    "disclaimer": "AZR is not a stablecoin. Its value fluctuates based on market conditions. Staking involves risk. This is not financial advice. Always do your own research.",
+    "links": "Quick Links",
+    "community": "Community",
+    "contract": "Contract",
+    "bscScan": "BscScan",
+    "rights": "© 2025 Azora. All rights reserved."
+  },
+  "app": {
+    "dashboard": "Dashboard",
+    "swap": "Swap",
+    "stake": "Stake",
+    "referrals": "Referrals",
+    "withdrawals": "Withdrawals",
+    "disconnect": "Disconnect",
+    "network": "BNB Smart Chain",
+    "connect": "Connect Wallet"
+  },
+  "connect": {
+    "title": "Connect Your Wallet",
+    "sub": "Choose your preferred wallet to get started.",
+    "registerTitle": "Claim Your Username",
+    "registerSub": "Create your unique username.azr identity on Azora.",
+    "usernamePlaceholder": "yourname (becomes yourname.azr)",
+    "referralPlaceholder": "Referral username (optional)",
+    "register": "Register & Enter App",
+    "registering": "Registering..."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "portfolio": "Portfolio Value",
+    "totalStaked": "Total Staked",
+    "claimable": "Claimable Rewards",
+    "referralEarnings": "Referral Earnings",
+    "activeStakes": "Active Stakes",
+    "claimAll": "Claim All Rewards",
+    "claiming": "Claiming...",
+    "noStakes": "No active stakes yet.",
+    "goStake": "Start Staking"
+  },
+  "swap": {
+    "title": "Swap",
+    "sub": "Exchange USDT ↔ AZR at 1:1 reserve rate.",
+    "balance": "Balance",
+    "max": "MAX",
+    "swapBtn": "Swap",
+    "swapping": "Swapping...",
+    "rateNote": "1 USDT = 1 AZR (reserve rate)"
+  },
+  "staking": {
+    "title": "Stake",
+    "amount": "Amount to Stake",
+    "minStake": "Min stake",
+    "lockPeriod": "Lock period",
+    "daily": "Daily reward",
+    "estDaily": "Est. daily earnings",
+    "stakeBtn": "Stake AZR",
+    "staking": "Staking...",
+    "claim": "Claim",
+    "unstake": "Unstake",
+    "lockedUntil": "Locked until",
+    "pending": "Pending"
+  },
+  "referralsPage": {
+    "title": "Referrals",
+    "yourLink": "Your Referral Link",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "l1Earnings": "L1 Earnings",
+    "l2Earnings": "L2 Earnings",
+    "l3Earnings": "L3 Earnings",
+    "history": "Commission History",
+    "noEarnings": "No referral earnings yet.",
+    "shareLink": "Share your link to start earning commissions."
+  },
+  "withdrawalsPage": {
+    "title": "Withdrawals",
+    "request": "Request Withdrawal",
+    "asset": "Asset",
+    "amount": "Amount",
+    "fee": "Withdrawal fee",
+    "youGet": "You receive",
+    "submit": "Submit Request",
+    "submitting": "Submitting...",
+    "queue": "Withdrawal Queue",
+    "noRequests": "No withdrawal requests yet.",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected"
+  }
+}

@@ -1,0 +1,60 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  walletAddress   String   @unique
+  referredByUser  User?    @relation("Referrals", fields: [referredById], references: [id])
+  referredById    String?
+  referrals       User[]   @relation("Referrals")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  stakes           Stake[]
+  withdrawals      Withdrawal[]
+  referralEarnings ReferralEarning[]
+}
+
+model Stake {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  amount        String
+  stakeStartTime DateTime
+  unlockTime    DateTime
+  lastClaimTime DateTime
+  isActive      Boolean  @default(true)
+  txHash        String?
+  createdAt     DateTime @default(now())
+}
+
+model Withdrawal {
+  id           String   @id @default(cuid())
+  contractId   Int
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  amount       String
+  assetType    Int      // 0=AZR 1=USDT
+  status       Int      @default(0) // 0=PENDING 1=APPROVED 2=REJECTED
+  txHash       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ReferralEarning {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  fromUser   String
+  level      Int
+  amount     String
+  txHash     String?
+  createdAt  DateTime @default(now())
+}

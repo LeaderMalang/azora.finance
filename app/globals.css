@@ -1,27 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Theme tokens ──────────────────────────────────────────── */
+:root, .dark {
+  --teal: #2dd4bf; --teal-bright: #5eead4; --teal-deep: #0d9488;
+  --teal-glow: rgba(45,212,191,0.45);
+  --bg: #060a12; --bg-2: #080d17;
+  --surface: #0d1623; --surface-2: #111c2c; --elevated: #13202f;
+  --line: rgba(255,255,255,0.09); --line-strong: rgba(255,255,255,0.16);
+  --text: #e9f0f7; --text-2: #aab6c6; --muted: #6d7d90;
+  --grid-line: rgba(255,255,255,0.035);
+}
+.light {
+  --bg: #f4f6fa; --bg-2: #eef1f7;
+  --surface: #ffffff; --surface-2: #f7f9fc; --elevated: #ffffff;
+  --line: rgba(12,22,36,0.10); --line-strong: rgba(12,22,36,0.18);
+  --text: #0c1422; --text-2: #44566b; --muted: #74859a;
+  --grid-line: rgba(12,22,36,0.04);
+  --teal-deep: #0c8c7b; --teal-glow: rgba(13,148,136,0.30);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.5s cubic-bezier(0.22,1,0.36,1), color 0.4s cubic-bezier(0.22,1,0.36,1);
   }
+  ::selection { background: var(--teal); color: #04201c; }
+  h1, h2, h3 { font-family: "Bricolage Grotesque", sans-serif; letter-spacing: -0.03em; }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* ── Component helpers ─────────────────────────────────────── */
+@layer components {
+  .az-card { @apply rounded-card border bg-surface p-6; border-color: var(--line); }
+  .az-card-glow {
+    @apply rounded-card border p-6;
+    border-color: color-mix(in oklab, var(--teal) 30%, transparent);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--teal) 7%, var(--surface)), var(--surface));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--teal) 22%, transparent), 0 26px 60px -34px var(--teal-glow);
   }
+  .az-btn { @apply inline-flex items-center justify-center gap-2 rounded-ctl px-5 py-3 font-semibold transition; }
+  .az-btn-primary { @apply az-btn text-[#04201c]; background: var(--teal); box-shadow: 0 8px 30px -10px var(--teal-glow); }
+  .az-btn-primary:hover { background: var(--teal-bright); transform: translateY(-2px); }
+  .az-btn-ghost { @apply az-btn border bg-surface; border-color: var(--line-strong); color: var(--text); }
+  .az-btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+  .az-input {
+    @apply w-full rounded-ctl border px-4 py-3.5 font-mono outline-none transition;
+    background: var(--bg-2); border-color: var(--line); color: var(--text);
+  }
+  .az-input:focus { border-color: var(--teal); }
+  .az-chip {
+    @apply inline-flex items-center gap-2 rounded-pill border px-3 py-1.5 font-mono text-xs;
+    border-color: var(--line); color: var(--text-2);
+  }
+  .az-mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .side-link {
+    @apply flex items-center gap-3 rounded-ctl px-3 py-2.5 text-[15px] font-medium transition-all;
+    color: var(--text-2);
+  }
+  .side-link:hover { background: var(--surface); color: var(--text); }
+  .side-link.active { color: var(--teal); background: rgba(45,212,191,0.06); padding-left: 10px; border-left: 2px solid var(--teal); }
+  .badge { @apply inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 font-mono text-xs; }
+  .badge-pending { @apply badge; background: rgba(243,186,47,0.12); color: #f3ba2f; }
+  .badge-approved { @apply badge; background: rgba(45,212,191,0.12); color: var(--teal); }
+  .badge-rejected { @apply badge; background: rgba(255,107,107,0.12); color: #ff6b6b; }
+  .badge-active   { @apply badge; background: rgba(45,212,191,0.12); color: var(--teal); }
+  .prog-bar { @apply h-2 w-full rounded-full overflow-hidden; background: var(--bg-2); }
+  .prog-fill { @apply h-full rounded-full; background: linear-gradient(90deg, var(--teal-deep), var(--teal)); }
 }
+
+/* ── Scroll reveal (SSR-safe) ──────────────────────────────── */
+.reveal { opacity: 1; }
+.js .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1); }
+.js .reveal.in { opacity: 1; transform: none; }
+.js .reveal.d1 { transition-delay: 0.08s; }
+.js .reveal.d2 { transition-delay: 0.16s; }
+.js .reveal.d3 { transition-delay: 0.24s; }
+@media (prefers-reduced-motion: reduce) { .js .reveal { opacity: 1; transform: none; } }
+.aurora-blob { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }

@@ -1,0 +1,127 @@
+"use client";
+
+import { AppTopbar } from "@/components/app/AppTopbar";
+import { useTranslations } from "next-intl";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
+import { useActiveChain } from "@/lib/hooks";
+import { formatUnits, parseUnits } from "viem";
+import { useState } from "react";
+import { useToast } from "@/components/ui/Toast";
+
+
+export default function WithdrawalsPage() {
+  const t = useTranslations("withdrawalsPage");
+  const { address: addr } = useAccount();
+  const { toast } = useToast();
+  const { chainId } = useActiveChain();
+
+  const [asset, setAsset] = useState<0 | 1>(0); // 0=AZR 1=USDT
+  const [amount, setAmount] = useState("");
+
+  const { writeContractAsync, data: txHash } = useWriteContract();
+  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
+  const { data: azrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: usdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: reqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+
+  const fee = feeBps ? Number(feeBps as bigint) / 10000 : 0.02;
+  const feeAmt = amount ? parseFloat(amount) * fee : 0;
+  const youGet = amount ? parseFloat(amount) - feeAmt : 0;
+  const bal = asset === 0 ? (azrBal ? parseFloat(formatUnits(azrBal as bigint, 18)) : 0) : (usdtBal ? parseFloat(formatUnits(usdtBal as bigint, 18)) : 0);
+  const assetLabel = asset === 0 ? "AZR" : "USDT";
+
+  const doRequest = async () => {
+    if (!addr || !amount || parseFloat(amount) <= 0) return;
+    const parsed = parseUnits(amount, 18);
+    const tokenAddr = asset === 0 ? CONTRACTS[chainId].azoraToken : CONTRACTS[chainId].usdt;
+    try {
+      await writeContractAsync({ address: tokenAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "requestWithdrawal", args: [parsed, asset] });
+      toast(`Withdrawal of ${amount} ${assetLabel} requested`);
+      setAmount("");
+    } catch (e) {
+      toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
+    }
+  };
+
+  return (
+    <>
+      <AppTopbar title={t("title")} sub="Request & track payout queue" />
+      <div className="p-8 max-w-app">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="az-card">
+            <h3 className="font-semibold mb-5">{t("request")}</h3>
+            <div className="mb-4">
+              <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>{t("asset")}</label>
+              <div className="flex gap-2">
+                {[{ label: "AZR", val: 0 }, { label: "USDT", val: 1 }].map((o) => (
+                  <button
+                    key={o.val}
+                    onClick={() => { setAsset(o.val as 0 | 1); setAmount(""); }}
+                    className="flex-1 py-2.5 rounded-ctl border text-sm font-semibold transition-all"
+                    style={{
+                      borderColor: asset === o.val ? "var(--teal)" : "var(--line)",
+                      background: asset === o.val ? "rgba(45,212,191,0.08)" : "var(--bg-2)",
+                      color: asset === o.val ? "var(--teal)" : "var(--text-2)",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs az-mono" style={{ color: "var(--muted)" }}>{t("amount")}</label>
+                <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>Bal: {bal.toFixed(2)} {assetLabel}</span>
+              </div>
+              <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div className="space-y-2 mb-5 text-sm">
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-2)" }}>{t("fee")} ({(fee * 100).toFixed(1)}%)</span>
+                <span className="az-mono">{feeAmt.toFixed(4)} {assetLabel}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>{t("youGet")}</span>
+                <span className="az-mono text-teal">{youGet.toFixed(4)} {assetLabel}</span>
+              </div>
+            </div>
+            <button className="az-btn-primary w-full" onClick={doRequest} disabled={confirming || !amount}>
+              {confirming ? t("submitting") : t("submit")}
+            </button>
+          </div>
+        </div>
+
+        <div className="az-card">
+          <h3 className="font-semibold mb-4">{t("queue")}</h3>
+          {!reqCount || Number(reqCount as bigint) === 0 ? (
+            <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>{t("noRequests")}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                    <th className="text-left pb-3 font-normal">#</th>
+                    <th className="text-left pb-3 font-normal">Asset</th>
+                    <th className="text-left pb-3 font-normal">Amount</th>
+                    <th className="text-left pb-3 font-normal">Status</th>
+                    <th className="text-left pb-3 font-normal">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-3 az-mono" colSpan={5} style={{ color: "var(--muted)" }}>Loading on-chain requests…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

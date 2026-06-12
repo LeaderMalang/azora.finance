@@ -1,0 +1,62 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: "class",
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        teal: { DEFAULT: "#2dd4bf", bright: "#5eead4", deep: "#0d9488" },
+        bg: "var(--bg)",
+        "bg-2": "var(--bg-2)",
+        surface: "var(--surface)",
+        "surface-2": "var(--surface-2)",
+        elevated: "var(--elevated)",
+        line: "var(--line)",
+        "line-strong": "var(--line-strong)",
+        content: "var(--text)",
+        "content-2": "var(--text-2)",
+        muted: "var(--muted)",
+        warn: "#f3ba2f",
+        danger: "#ff6b6b",
+        usdt: "#26a17b",
+      },
+      fontFamily: {
+        display: ['"Bricolage Grotesque"', "system-ui", "sans-serif"],
+        sans: ['"Space Grotesk"', "system-ui", "sans-serif"],
+        mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
+      },
+      fontSize: {
+        hero: ["clamp(44px,6.6vw,84px)", { lineHeight: "0.98", letterSpacing: "-0.035em" }],
+        "section-title": ["clamp(34px,5vw,56px)", { lineHeight: "1.02", letterSpacing: "-0.03em" }],
+      },
+      borderRadius: { card: "22px", ctl: "12px", pill: "999px" },
+      boxShadow: {
+        card: "0 24px 60px -24px rgba(0,0,0,0.7)",
+        glow: "0 0 0 1px rgba(45,212,191,0.15), 0 24px 70px -30px rgba(45,212,191,0.45)",
+        "glow-sm": "0 8px 30px -10px rgba(45,212,191,0.45)",
+      },
+      transitionTimingFunction: { out: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      maxWidth: { site: "1240px", app: "1100px" },
+      keyframes: {
+        drift1: { "0%,100%": { transform: "translate(0,0)" }, "50%": { transform: "translate(80px,60px)" } },
+        drift2: { "0%,100%": { transform: "translate(0,0)" }, "50%": { transform: "translate(-70px,50px)" } },
+        drift3: { "0%,100%": { transform: "translate(0,0)" }, "50%": { transform: "translate(40px,-70px)" } },
+        pulse: { "0%,100%": { boxShadow: "0 0 0 0 rgba(45,212,191,0.45)" }, "50%": { boxShadow: "0 0 0 6px transparent" } },
+        revealUp: { from: { opacity: "0", transform: "translateY(26px)" }, to: { opacity: "1", transform: "none" } },
+        toastIn: { from: { opacity: "0", transform: "translateY(12px) scale(0.96)" } },
+      },
+      animation: {
+        drift1: "drift1 22s ease-in-out infinite",
+        drift2: "drift2 26s ease-in-out infinite",
+        drift3: "drift3 30s ease-in-out infinite",
+        pulse: "pulse 2.4s ease-in-out infinite",
+        revealUp: "revealUp 0.7s cubic-bezier(0.22,1,0.36,1) both",
+        toastIn: "toastIn 0.4s cubic-bezier(0.22,1,0.36,1)",
+      },
+    },
+  },
+  plugins: [],
+};
