@@ -33,22 +33,19 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
 
   useEffect(() => { setMounted(true); }, []);
 
-  const { data: userInfo, isFetched: userInfoFetched } = useReadContract({
+  const { data: userInfo } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
     functionName: "getUserInfo",
     args: addr ? [addr] : undefined,
+    chainId: targetChain.id,
     query: { enabled: !!addr && isConnected },
   });
   const isRegistered = Boolean(userInfo?.[2]);
 
-  // Only show the modal once we know the user's registration state.
-  // Gating on userInfoFetched prevents the flash of "Claim Username" on reload
-  // for wallets that are already registered.
-  const showModal = mounted && (
-    !isConnected ||
-    (isConnected && userInfoFetched && !isRegistered)
-  );
+  // Show modal whenever the user is not yet confirmed as registered.
+  // ConnectModal handles the verifying/error/claim states internally.
+  const showModal = mounted && !isRegistered;
 
   return (
     <ToastProvider>

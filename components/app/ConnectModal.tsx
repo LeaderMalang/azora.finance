@@ -36,19 +36,30 @@ export function ConnectModal() {
   const [isPendingReg, setIsPendingReg] = useState(false);
   const [regTxHash, setRegTxHash] = useState<`0x${string}` | undefined>();
 
-  const { data: userInfo } = useReadContract({
+  // Always query the correct chain regardless of connected wallet's chain
+  const {
+    data: userInfo,
+    isFetched: userInfoFetched,
+    isError: userInfoError,
+    refetch: retryUserInfo,
+  } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
     functionName: "getUserInfo",
     args: addr ? [addr] : undefined,
+    chainId: targetChain.id,
     query: {
       enabled: !!addr && isConnected,
       refetchInterval: isPendingReg ? 2000 : false,
+      retry: 3,
     },
   });
   const isRegistered = Boolean(userInfo?.[2]);
 
-  // Watch for on-chain revert — surfaces the error so the user isn't stuck
+  // True while wallet is connected but on-chain status not yet confirmed
+  const isChecking = isConnected && !userInfoFetched && !userInfoError;
+
+  // Watch for on-chain revert to surface the error instead of looping forever
   const { data: txReceipt } = useWaitForTransactionReceipt({
     hash: regTxHash,
     query: { enabled: !!regTxHash },
@@ -63,12 +74,16 @@ export function ConnectModal() {
     }
   }, [txReceipt]);
 
-  // Advance to username step once wallet is connected (and not yet registered)
+  // Advance steps only after the query has confirmed status (not while loading)
   useEffect(() => {
-    if (isConnected && !isRegistered) setStep(1);
-  }, [isConnected, isRegistered]);
+    if (!isConnected) {
+      setStep(0);
+    } else if (userInfoFetched && !userInfoError && !isRegistered) {
+      setStep(1);
+    }
+  }, [isConnected, isRegistered, userInfoFetched, userInfoError]);
 
-  // Stop polling once the chain confirms registration
+  // Stop polling once registration is confirmed
   useEffect(() => {
     if (isRegistered) setIsPendingReg(false);
   }, [isRegistered]);
@@ -110,7 +125,34 @@ export function ConnectModal() {
           <span className="font-display font-semibold text-xl">Azora</span>
         </div>
 
-        {step === 0 && (
+        {userInfoError ? (
+          <div className="flex flex-col items-center gap-4 py-8 text-center">
+            <svg className="w-10 h-10" style={{ color: "#ff6b6b" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+            <p className="text-sm" style={{ color: "var(--text-2)" }}>
+              Unable to verify your account. Please check your connection and try again.
+            </p>
+            <button className="az-btn-ghost text-sm px-4 py-2" onClick={() => retryUserInfo()}>
+              Retry
+            </button>
+            <button
+              className="text-sm"
+              style={{ color: "var(--muted)" }}
+              onClick={() => { disconnect(); setStep(0); }}
+            >
+              ← Choose another wallet
+            </button>
+          </div>
+        ) : isChecking ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <Spinner size="lg" />
+            <p className="text-sm text-center" style={{ color: "var(--text-2)" }}>
+              Verifying your account…
+            </p>
+          </div>
+        ) : step === 0 ? (
           <>
             <h2 className="font-display font-bold text-2xl mb-2">{t("title")}</h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-2)" }}>{t("sub")}</p>
@@ -132,9 +174,7 @@ export function ConnectModal() {
               ))}
             </div>
           </>
-        )}
-
-        {step === 1 && (
+        ) : step === 1 ? (
           <>
             <h2 className="font-display font-bold text-2xl mb-2">{t("registerTitle")}</h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-2)" }}>{t("registerSub")}</p>
@@ -192,7 +232,7 @@ export function ConnectModal() {
               </div>
             )}
           </>
-        )}
+        ) : null}
 
         <div className="flex justify-center gap-2 mt-6">
           {[0, 1].map((i) => (
