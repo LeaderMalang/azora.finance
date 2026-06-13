@@ -2,6 +2,7 @@
 
 import { defaultWagmiConfig } from "@web3modal/wagmi/react/config";
 import { cookieStorage, createStorage } from "wagmi";
+import { http, fallback } from "viem";
 import { bsc, bscTestnet } from "viem/chains";
 
 const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
@@ -22,4 +23,16 @@ export const wagmiConfig = defaultWagmiConfig({
   metadata,
   ssr: true,
   storage: createStorage({ storage: cookieStorage }),
+  transports: {
+    [bsc.id]: fallback([
+      http("https://bsc-dataseed.bnbchain.org"),
+      http("https://bsc.publicnode.com"),
+      http("https://bsc-dataseed1.defibit.io"),
+    ]),
+    [bscTestnet.id]: fallback([
+      http("https://bsc-testnet.publicnode.com"),
+      http("https://data-seed-prebsc-1-s1.bnbchain.org:8545"),
+      http("https://data-seed-prebsc-2-s1.bnbchain.org:8545"),
+    ]),
+  },
 });

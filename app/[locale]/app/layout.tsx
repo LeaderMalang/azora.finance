@@ -39,7 +39,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
     functionName: "getUserInfo",
     args: addr ? [addr] : undefined,
     chainId: targetChain.id,
-    query: { enabled: !!addr && isConnected },
+    query: { enabled: !!addr && isConnected, retry: 3 },
   });
   const isRegistered = Boolean(userInfo?.[2]);
 
