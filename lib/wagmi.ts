@@ -25,14 +25,14 @@ export const wagmiConfig = defaultWagmiConfig({
   storage: createStorage({ storage: cookieStorage }),
   transports: {
     [bsc.id]: fallback([
+      http("https://bsc-mainnet.g.allthatnode.com/full/evm/67c9f4bea38841abaac905427040ae56"),
       http("https://bsc-dataseed.bnbchain.org"),
       http("https://bsc.publicnode.com"),
-      http("https://bsc-dataseed1.defibit.io"),
     ]),
     [bscTestnet.id]: fallback([
+      http("https://bsc-testnet.g.allthatnode.com/full/evm/67c9f4bea38841abaac905427040ae56"),
       http("https://bsc-testnet.publicnode.com"),
       http("https://data-seed-prebsc-1-s1.bnbchain.org:8545"),
-      http("https://data-seed-prebsc-2-s1.bnbchain.org:8545"),
     ]),
   },
 });
