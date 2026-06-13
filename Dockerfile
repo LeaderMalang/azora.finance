@@ -29,6 +29,7 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
 # Prisma generate only needs the schema path (no real DB connection)
 ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/azora
+ENV DOCKER_BUILD=true
 RUN npx prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1

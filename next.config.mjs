@@ -4,7 +4,8 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // standalone output is only needed for Docker; Vercel handles its own bundling
+  ...(process.env.DOCKER_BUILD === "true" && { output: "standalone" }),
   images: { domains: [] },
   webpack: (config) => {
     // Stub optional wallet connector dependencies not installed
