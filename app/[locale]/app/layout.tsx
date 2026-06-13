@@ -33,7 +33,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
 
   useEffect(() => { setMounted(true); }, []);
 
-  const { data: userInfo } = useReadContract({
+  const { data: userInfo, isFetched: userInfoFetched } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
     functionName: "getUserInfo",
@@ -42,9 +42,17 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   });
   const isRegistered = Boolean(userInfo?.[2]);
 
+  // Only show the modal once we know the user's registration state.
+  // Gating on userInfoFetched prevents the flash of "Claim Username" on reload
+  // for wallets that are already registered.
+  const showModal = mounted && (
+    !isConnected ||
+    (isConnected && userInfoFetched && !isRegistered)
+  );
+
   return (
     <ToastProvider>
-      {mounted && (!isConnected || !isRegistered) && <ConnectModal />}
+      {showModal && <ConnectModal />}
       <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
         <AppSidebar locale={locale} />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">

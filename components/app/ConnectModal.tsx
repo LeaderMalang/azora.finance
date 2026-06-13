@@ -2,7 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { useAccount, useWriteContract, useReadContract } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useReadContract,
+  useDisconnect,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { useState, useEffect } from "react";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
@@ -19,13 +25,16 @@ export function ConnectModal() {
   const t = useTranslations("connect");
   const { open } = useWeb3Modal();
   const { isConnected, address: addr } = useAccount();
+  const { disconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
+
   const [step, setStep] = useState(0);
   const [username, setUsername] = useState("");
   const [referral, setReferral] = useState("");
   const [err, setErr] = useState("");
   const [registering, setRegistering] = useState(false);
   const [isPendingReg, setIsPendingReg] = useState(false);
+  const [regTxHash, setRegTxHash] = useState<`0x${string}` | undefined>();
 
   const { data: userInfo } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
@@ -39,12 +48,30 @@ export function ConnectModal() {
   });
   const isRegistered = Boolean(userInfo?.[2]);
 
+  // Watch for on-chain revert — surfaces the error so the user isn't stuck
+  const { data: txReceipt } = useWaitForTransactionReceipt({
+    hash: regTxHash,
+    query: { enabled: !!regTxHash },
+  });
+  useEffect(() => {
+    if (!txReceipt) return;
+    if (txReceipt.status === "reverted") {
+      setIsPendingReg(false);
+      setRegistering(false);
+      setRegTxHash(undefined);
+      setErr("Transaction reverted — username may already be taken or referral is invalid.");
+    }
+  }, [txReceipt]);
+
+  // Advance to username step once wallet is connected (and not yet registered)
+  useEffect(() => {
+    if (isConnected && !isRegistered) setStep(1);
+  }, [isConnected, isRegistered]);
+
   // Stop polling once the chain confirms registration
   useEffect(() => {
     if (isRegistered) setIsPendingReg(false);
   }, [isRegistered]);
-
-  if (isConnected && !isRegistered && step === 0) setStep(1);
 
   const register = async () => {
     const u = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
@@ -53,18 +80,18 @@ export function ConnectModal() {
     setRegistering(true);
     try {
       const chainId = targetChain.id as 56 | 97;
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: CONTRACTS[chainId].staking,
         abi: STAKING_ABI,
         functionName: "registerUser",
         args: [u, referral.trim().replace(/\.azr$/, "")],
       });
-      setIsPendingReg(true); // tx broadcast → start polling every 2 s
+      setRegTxHash(hash);
+      setIsPendingReg(true);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message.slice(0, 120) : "Transaction failed");
-      setRegistering(false); // re-enable only on rejection/error
+      setRegistering(false);
     }
-    // No finally — button stays locked until isPendingReg resolves
   };
 
   if (isRegistered) return null;
@@ -147,11 +174,19 @@ export function ConnectModal() {
                   />
                 </div>
                 {err && <p className="text-xs" style={{ color: "#ff6b6b" }}>{err}</p>}
-                <button className="az-btn-primary w-full" onClick={register} disabled={registering}>
+                <button
+                  className="az-btn-primary w-full"
+                  onClick={register}
+                  disabled={registering || isPendingReg}
+                >
                   {registering ? t("registering") : t("register")}
                   {!registering && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
                 </button>
-                <button className="w-full text-center text-sm" style={{ color: "var(--muted)" }} onClick={() => { setStep(0); }}>
+                <button
+                  className="w-full text-center text-sm"
+                  style={{ color: "var(--muted)" }}
+                  onClick={() => { disconnect(); setStep(0); }}
+                >
                   ← Choose another wallet
                 </button>
               </div>
