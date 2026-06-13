@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { AuroraBackground } from "@/components/landing/AuroraBackground";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Hero } from "@/components/landing/Hero";
@@ -10,8 +11,9 @@ import { FAQ } from "@/components/landing/FAQ";
 import { CTABand } from "@/components/landing/CTABand";
 import { Footer } from "@/components/landing/Footer";
 
-export default function LandingPage({ params }: { params: { locale: string } }) {
+export default async function LandingPage({ params }: { params: { locale: string } }) {
   const { locale } = params;
+  await getTranslations({ locale, namespace: "hero" });
   return (
     <>
       <AuroraBackground />

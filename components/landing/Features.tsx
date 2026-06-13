@@ -36,20 +36,8 @@ export function Features() {
           {feats.map((f, i) => (
             <div
               key={i}
-              className={`rounded-card border p-7 transition-all duration-300 cursor-default reveal ${stagger[i]}`}
-              style={{ background: "var(--bg)", borderColor: "var(--line)" }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = "rgba(45,212,191,0.45)";
-                el.style.boxShadow = "0 0 0 1px rgba(45,212,191,0.22), 0 26px 60px -34px rgba(45,212,191,0.45)";
-                el.style.transform = "translateY(-3px)";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = "var(--line)";
-                el.style.boxShadow = "";
-                el.style.transform = "";
-              }}
+              className={`rounded-card border p-7 cursor-default reveal feat-card ${stagger[i]}`}
+              style={{ background: "var(--bg)" }}
             >
               <div className="w-11 h-11 rounded-ctl flex items-center justify-center mb-5 transition-colors" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
                 <div className="w-5 h-5">{icons[f.icon]}</div>
