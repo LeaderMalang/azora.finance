@@ -11,6 +11,8 @@ const icons = [
   <svg key={5} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
 ];
 
+const stagger = ["d1", "d2", "d3", "d1", "d2", "d3"];
+
 export function Features() {
   const t = useTranslations("features");
   const feats = [
@@ -25,7 +27,7 @@ export function Features() {
   return (
     <section id="features" className="py-24" style={{ background: "var(--surface)" }}>
       <div className="mx-auto max-w-site px-6">
-        <div className="mb-14 max-w-xl">
+        <div className="mb-14 max-w-xl reveal">
           <span className="az-mono text-xs tracking-widest uppercase text-teal mb-3 block">{t("title")}</span>
           <h2 className="font-display font-bold mb-4" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>AI behind every action.</h2>
           <p style={{ color: "var(--text-2)" }}>{t("sub")}</p>
@@ -34,17 +36,19 @@ export function Features() {
           {feats.map((f, i) => (
             <div
               key={i}
-              className="group rounded-card border p-7 transition-all duration-300 cursor-default"
+              className={`rounded-card border p-7 transition-all duration-300 cursor-default reveal ${stagger[i]}`}
               style={{ background: "var(--bg)", borderColor: "var(--line)" }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget;
                 el.style.borderColor = "rgba(45,212,191,0.45)";
                 el.style.boxShadow = "0 0 0 1px rgba(45,212,191,0.22), 0 26px 60px -34px rgba(45,212,191,0.45)";
+                el.style.transform = "translateY(-3px)";
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget;
                 el.style.borderColor = "var(--line)";
                 el.style.boxShadow = "";
+                el.style.transform = "";
               }}
             >
               <div className="w-11 h-11 rounded-ctl flex items-center justify-center mb-5 transition-colors" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>

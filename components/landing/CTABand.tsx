@@ -7,7 +7,7 @@ export function CTABand({ locale }: { locale: string }) {
   const t = useTranslations("cta");
   return (
     <section
-      className="py-28 text-center relative overflow-hidden"
+      className="py-28 text-center relative overflow-hidden reveal"
       style={{ background: `radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 70%), var(--bg)` }}
     >
       <div className="mx-auto max-w-site px-6">

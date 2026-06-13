@@ -6,6 +6,8 @@
 
 /* ── Theme tokens ──────────────────────────────────────────── */
 :root, .dark {
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bg-rgb: 6,10,18;
   --teal: #2dd4bf; --teal-bright: #5eead4; --teal-deep: #0d9488;
   --teal-glow: rgba(45,212,191,0.45);
   --bg: #060a12; --bg-2: #080d17;
@@ -75,6 +77,12 @@
   .prog-bar { @apply h-2 w-full rounded-full overflow-hidden; background: var(--bg-2); }
   .prog-fill { @apply h-full rounded-full; background: linear-gradient(90deg, var(--teal-deep), var(--teal)); }
 }
+
+/* ── Hover motion helpers ──────────────────────────────────── */
+.how-step { transition: border-color 0.3s var(--ease), transform 0.3s var(--ease); }
+.how-step:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+.wallet-opt { transition: all 0.18s var(--ease); }
+.wallet-opt:hover { border-color: var(--teal); transform: translateY(-1px); }
 
 /* ── Scroll reveal (SSR-safe) ──────────────────────────────── */
 .reveal { opacity: 1; }

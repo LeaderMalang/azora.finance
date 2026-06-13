@@ -19,13 +19,13 @@ export function FAQ() {
   return (
     <section id="faq" className="py-24" style={{ background: "var(--surface)" }}>
       <div className="mx-auto max-w-site px-6 max-w-3xl">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 reveal">
           <span className="az-mono text-xs tracking-widest uppercase text-teal mb-3 block">{t("title")}</span>
           <h2 className="font-display font-bold" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>Questions, answered.</h2>
         </div>
         <div className="divide-y" style={{ borderColor: "var(--line)" }}>
           {items.map((item, i) => (
-            <div key={i} className="border-b" style={{ borderColor: "var(--line)" }}>
+            <div key={i} className={`border-b reveal d${(i % 3) + 1}`} style={{ borderColor: "var(--line)" }}>
               <button
                 className="flex w-full items-center justify-between gap-4 py-5 text-left font-semibold transition-colors"
                 style={{ color: open === i ? "var(--teal)" : "var(--text)" }}

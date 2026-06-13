@@ -27,31 +27,47 @@ const config: Config = {
       },
       maxWidth: {
         site: "1280px",
+        app: "960px",
       },
       fontFamily: {
         display: ["Bricolage Grotesque", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
-      animation: {
-        drift1: "drift1 20s ease-in-out infinite",
-        drift2: "drift2 25s ease-in-out infinite",
-        drift3: "drift3 18s ease-in-out infinite",
+      transitionTimingFunction: {
+        out: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
       keyframes: {
         drift1: {
-          "0%, 100%": { transform: "translate(0,0) scale(1)" },
-          "33%": { transform: "translate(-60px,40px) scale(1.05)" },
-          "66%": { transform: "translate(40px,-30px) scale(0.95)" },
+          "0%,100%": { transform: "translate(0,0)" },
+          "50%": { transform: "translate(80px,60px)" },
         },
         drift2: {
-          "0%, 100%": { transform: "translate(0,0) scale(1)" },
-          "40%": { transform: "translate(50px,-60px) scale(1.07)" },
-          "70%": { transform: "translate(-30px,50px) scale(0.93)" },
+          "0%,100%": { transform: "translate(0,0)" },
+          "50%": { transform: "translate(-70px,50px)" },
         },
         drift3: {
-          "0%, 100%": { transform: "translate(0,0) scale(1)" },
-          "50%": { transform: "translate(-40px,30px) scale(1.1)" },
+          "0%,100%": { transform: "translate(0,0)" },
+          "50%": { transform: "translate(40px,-70px)" },
         },
+        glowPulse: {
+          "0%,100%": { boxShadow: "0 0 0 0 rgba(45,212,191,0.45)" },
+          "50%": { boxShadow: "0 0 0 6px transparent" },
+        },
+        modalIn: {
+          from: { opacity: "0", transform: "scale(0.96) translateY(8px)" },
+          to: { opacity: "1", transform: "none" },
+        },
+        toastIn: {
+          from: { opacity: "0", transform: "translateY(12px) scale(0.96)" },
+        },
+      },
+      animation: {
+        drift1: "drift1 22s ease-in-out infinite",
+        drift2: "drift2 26s ease-in-out infinite",
+        drift3: "drift3 30s ease-in-out infinite",
+        "glow-pulse": "glowPulse 2.4s ease-in-out infinite",
+        "modal-in": "modalIn 0.25s cubic-bezier(0.22,1,0.36,1) both",
+        "toast-in": "toastIn 0.4s cubic-bezier(0.22,1,0.36,1)",
       },
     },
   },

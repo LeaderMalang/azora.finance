@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { useAccount, useWriteContract } from "wagmi";
-import { useState } from "react";
+import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { useState, useEffect } from "react";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
 
@@ -17,15 +17,28 @@ const WALLETS = [
 export function ConnectModal() {
   const t = useTranslations("connect");
   const { open } = useWeb3Modal();
-  const { isConnected } = useAccount();
+  const { isConnected, address: addr } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const [step, setStep] = useState(0);
   const [username, setUsername] = useState("");
   const [referral, setReferral] = useState("");
   const [err, setErr] = useState("");
   const [registering, setRegistering] = useState(false);
+  const [regTxHash, setRegTxHash] = useState<`0x${string}` | undefined>();
 
-  if (isConnected && step === 0) setStep(1);
+  const { data: userInfo, refetch: refetchUser } = useReadContract({
+    address: CONTRACTS[targetChain.id as 56 | 97].staking,
+    abi: STAKING_ABI,
+    functionName: "getUserInfo",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr && isConnected },
+  });
+  const isRegistered = Boolean(userInfo?.[2]);
+
+  const { isSuccess: regConfirmed } = useWaitForTransactionReceipt({ hash: regTxHash });
+  useEffect(() => { if (regConfirmed) refetchUser(); }, [regConfirmed]);
+
+  if (isConnected && !isRegistered && step === 0) setStep(1);
 
   const register = async () => {
     const u = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
@@ -34,12 +47,13 @@ export function ConnectModal() {
     setRegistering(true);
     try {
       const chainId = targetChain.id as 56 | 97;
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: CONTRACTS[chainId].staking,
         abi: STAKING_ABI,
         functionName: "registerUser",
         args: [u, referral.trim().replace(/\.azr$/, "")],
       });
+      setRegTxHash(hash);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message.slice(0, 120) : "Transaction failed");
     } finally {
@@ -47,12 +61,12 @@ export function ConnectModal() {
     }
   };
 
-  if (isConnected && step >= 1) return null;
+  if (isRegistered) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(6,10,18,0.92)", backdropFilter: "blur(16px)" }}>
       <div
-        className="w-full max-w-[460px] mx-4 rounded-card border p-8"
+        className="w-full max-w-[460px] mx-4 rounded-card border p-8 animate-modal-in"
         style={{ background: "var(--surface)", borderColor: "var(--line)" }}
       >
         <div className="flex items-center gap-3 mb-6">

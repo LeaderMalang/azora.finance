@@ -20,7 +20,7 @@ function LiveCard() {
       <div className="flex items-center justify-between mb-4">
         <span className="az-mono text-[11px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>AI MONITOR · AZR</span>
         <span className="flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-mono" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-teal animate-glow-pulse" />
           LIVE
         </span>
       </div>
@@ -76,12 +76,12 @@ export function Hero({ locale }: { locale: string }) {
       <div className="mx-auto w-full max-w-site px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
-            <span className="az-chip mb-6 inline-flex">
-              <span className="w-2 h-2 rounded-full bg-teal" />
+            <span className="az-chip mb-6 inline-flex reveal">
+              <span className="w-2 h-2 rounded-full bg-teal animate-glow-pulse" />
               {t("eyebrow")}
             </span>
             <h1
-              className="font-display font-bold mb-6 leading-[0.98]"
+              className="font-display font-bold mb-6 leading-[0.98] reveal d1"
               style={{ fontSize: "clamp(44px,6.6vw,84px)", letterSpacing: "-0.035em" }}
             >
               Stake AZR.<br />
@@ -93,10 +93,10 @@ export function Hero({ locale }: { locale: string }) {
                 AI.
               </em>
             </h1>
-            <p className="text-lg mb-8 max-w-lg" style={{ color: "var(--text-2)" }}>
+            <p className="text-lg mb-8 max-w-lg reveal d2" style={{ color: "var(--text-2)" }}>
               {t("sub")}
             </p>
-            <div className="flex items-center gap-3 flex-wrap mb-8">
+            <div className="flex items-center gap-3 flex-wrap mb-8 reveal d3">
               <Link href={`/${locale}/app/dashboard`} className="az-btn-primary">
                 {t("cta1")}
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
@@ -105,7 +105,7 @@ export function Hero({ locale }: { locale: string }) {
                 {t("cta2")}
               </a>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap reveal d3">
               {[
                 { icon: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" /></svg>, label: t("trust1") },
                 { icon: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>, label: t("trust2") },
@@ -118,7 +118,7 @@ export function Hero({ locale }: { locale: string }) {
               ))}
             </div>
           </div>
-          <div className="lg:pl-8">
+          <div className="lg:pl-8 reveal d2">
             <LiveCard />
           </div>
         </div>

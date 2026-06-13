@@ -4,8 +4,10 @@ import { AppSidebar } from "@/components/app/AppSidebar";
 import { ConnectModal } from "@/components/app/ConnectModal";
 import { ToastProvider } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import { useState, useEffect } from "react";
+import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
+import { targetChain } from "@/lib/wagmi";
 
 function WrongNetworkBanner() {
   const { isConnected, chainId } = useAccount();
@@ -26,14 +28,23 @@ function WrongNetworkBanner() {
 }
 
 function AppShell({ children, locale }: { children: React.ReactNode; locale: string }) {
-  const { isConnected } = useAccount();
+  const { isConnected, address: addr } = useAccount();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
+  const { data: userInfo } = useReadContract({
+    address: CONTRACTS[targetChain.id as 56 | 97].staking,
+    abi: STAKING_ABI,
+    functionName: "getUserInfo",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr && isConnected },
+  });
+  const isRegistered = Boolean(userInfo?.[2]);
+
   return (
     <ToastProvider>
-      {mounted && !isConnected && <ConnectModal />}
+      {mounted && (!isConnected || !isRegistered) && <ConnectModal />}
       <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
         <AppSidebar locale={locale} />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">

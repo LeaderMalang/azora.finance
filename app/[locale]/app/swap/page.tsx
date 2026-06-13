@@ -78,7 +78,7 @@ export default function SwapPage() {
             <div className="flex justify-center my-4">
               <button
                 onClick={() => setDir(dir === "buy" ? "sell" : "buy")}
-                className="w-10 h-10 rounded-full border flex items-center justify-center transition-colors hover:border-teal"
+                className="w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-200 hover:rotate-180 hover:border-teal"
                 style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4" /></svg>

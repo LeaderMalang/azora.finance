@@ -28,7 +28,7 @@ export function Footer({ locale }: { locale: string }) {
   };
 
   return (
-    <footer className="py-16 border-t" style={{ borderColor: "var(--line)", background: "var(--bg-2)" }}>
+    <footer className="py-16 border-t reveal" style={{ borderColor: "var(--line)", background: "var(--bg-2)" }}>
       <div className="mx-auto max-w-site px-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div>

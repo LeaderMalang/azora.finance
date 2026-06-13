@@ -9,7 +9,7 @@ export function YieldCalculator() {
   const daily = amount * 0.007;
 
   return (
-    <section id="calc" className="pb-24">
+    <section id="calc" className="pb-24 reveal">
       <div className="mx-auto max-w-site px-6">
         <div
           className="rounded-card border overflow-hidden"

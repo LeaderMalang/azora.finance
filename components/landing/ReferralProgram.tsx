@@ -16,7 +16,7 @@ export function ReferralProgram() {
     <section id="referral" className="py-24">
       <div className="mx-auto max-w-site px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-          <div>
+          <div className="reveal">
             <span className="az-mono text-xs tracking-widest uppercase text-teal mb-3 block">{t("title")}</span>
             <h2 className="font-display font-bold mb-5" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>AI-tracked, three levels deep.</h2>
             <p className="mb-8" style={{ color: "var(--text-2)" }}>{t("sub")}</p>
@@ -45,7 +45,7 @@ export function ReferralProgram() {
             {NODES.map((n, i) => (
               <div
                 key={i}
-                className="flex items-center gap-4 rounded-card border px-5 py-4"
+                className={`flex items-center gap-4 rounded-card border px-5 py-4 reveal d${(i % 3) + 1}`}
                 style={{
                   background: n.isYou ? "linear-gradient(135deg, rgba(45,212,191,0.08), var(--surface))" : "var(--surface)",
                   borderColor: n.isYou ? "rgba(45,212,191,0.35)" : "var(--line)",

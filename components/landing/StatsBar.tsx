@@ -34,7 +34,7 @@ function CountUp({ to, decimals = 0, prefix = "", suffix = "" }: { to: number; d
 export function StatsBar() {
   const t = useTranslations("stats");
   return (
-    <section className="py-10 border-y" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
+    <section className="py-10 border-y reveal" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
       <div className="mx-auto max-w-site px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x" style={{ "--tw-divide-opacity": 1, borderColor: "var(--line)" } as React.CSSProperties}>
           {[

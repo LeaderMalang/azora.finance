@@ -8,6 +8,8 @@ const icons = [
   <svg key={2} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 17l6-6 4 4 8-8M21 7v5M21 7h-5" /></svg>,
 ];
 
+const stagger = ["d1", "d2", "d3"];
+
 export function HowItWorks() {
   const t = useTranslations("howItWorks");
   const steps = [
@@ -19,7 +21,7 @@ export function HowItWorks() {
   return (
     <section id="how" className="py-24">
       <div className="mx-auto max-w-site px-6">
-        <div className="mb-14 max-w-xl">
+        <div className="mb-14 max-w-xl reveal">
           <span className="az-mono text-xs tracking-widest uppercase text-teal mb-3 block">{t("title")}</span>
           <h2 className="font-display font-bold mb-4" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>Three phases. Zero manual intervention.</h2>
           <p style={{ color: "var(--text-2)" }}>{t("sub")}</p>
@@ -29,8 +31,7 @@ export function HowItWorks() {
           {steps.map((s, i) => (
             <div
               key={s.num}
-              className="az-card relative overflow-hidden group"
-              style={{ transition: "border-color 0.3s, box-shadow 0.3s" }}
+              className={`az-card relative overflow-hidden how-step reveal ${stagger[i]}`}
             >
               <div className="flex items-start gap-4 mb-5">
                 <span className="font-mono font-bold text-5xl opacity-10 leading-none select-none" style={{ color: "var(--teal)" }}>{s.num}</span>
