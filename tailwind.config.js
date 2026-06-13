@@ -2,6 +2,7 @@
 module.exports = {
   darkMode: "class",
   content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
@@ -47,6 +48,7 @@ module.exports = {
         pulse: { "0%,100%": { boxShadow: "0 0 0 0 rgba(45,212,191,0.45)" }, "50%": { boxShadow: "0 0 0 6px transparent" } },
         revealUp: { from: { opacity: "0", transform: "translateY(26px)" }, to: { opacity: "1", transform: "none" } },
         toastIn: { from: { opacity: "0", transform: "translateY(12px) scale(0.96)" } },
+        modalIn: { from: { opacity: "0", transform: "scale(0.96) translateY(8px)" }, to: { opacity: "1", transform: "none" } },
       },
       animation: {
         drift1: "drift1 22s ease-in-out infinite",
@@ -55,6 +57,9 @@ module.exports = {
         pulse: "pulse 2.4s ease-in-out infinite",
         revealUp: "revealUp 0.7s cubic-bezier(0.22,1,0.36,1) both",
         toastIn: "toastIn 0.4s cubic-bezier(0.22,1,0.36,1)",
+        "glow-pulse": "pulse 2.4s ease-in-out infinite",
+        "modal-in": "modalIn 0.25s cubic-bezier(0.22,1,0.36,1) both",
+        "toast-in": "toastIn 0.4s cubic-bezier(0.22,1,0.36,1)",
       },
     },
   },

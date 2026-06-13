@@ -53,7 +53,7 @@ export function AppSidebar({ locale }: { locale: string }) {
             <path d="M16 2 L29 24 H3 Z" stroke="var(--teal)" strokeWidth="2" strokeLinejoin="round" />
             <path d="M16 11 L22.5 22 H9.5 Z" fill="var(--teal)" />
           </svg>
-          Azor<b>a</b>
+          Azora
         </Link>
       </div>
 
