@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
@@ -23,9 +24,9 @@ export default function WithdrawalsPage() {
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
 
   const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
-  const { data: azrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: azrBal, isLoading: balLoading } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: usdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
-  const { data: reqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+  const { data: reqCount, isLoading: reqLoading } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
 
   const fee = feeBps ? Number(feeBps as bigint) / 10000 : 0.02;
   const feeAmt = amount ? parseFloat(amount) * fee : 0;
@@ -76,7 +77,9 @@ export default function WithdrawalsPage() {
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs az-mono" style={{ color: "var(--muted)" }}>{t("amount")}</label>
-                <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>Bal: {bal.toFixed(2)} {assetLabel}</span>
+                <span className="text-xs az-mono flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+                  Bal: {balLoading && !!addr ? <Skeleton className="inline-block w-16 h-3" /> : `${bal.toFixed(2)} ${assetLabel}`}
+                </span>
               </div>
               <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
@@ -98,7 +101,32 @@ export default function WithdrawalsPage() {
 
         <div className="az-card">
           <h3 className="font-semibold mb-4">{t("queue")}</h3>
-          {!reqCount || Number(reqCount as bigint) === 0 ? (
+          {reqLoading ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                    <th className="text-left pb-3 font-normal">#</th>
+                    <th className="text-left pb-3 font-normal">Asset</th>
+                    <th className="text-left pb-3 font-normal">Amount</th>
+                    <th className="text-left pb-3 font-normal">Status</th>
+                    <th className="text-left pb-3 font-normal">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2].map((i) => (
+                    <tr key={i}>
+                      {[0, 1, 2, 3, 4].map((j) => (
+                        <td key={j} className="py-3 pr-4">
+                          <Skeleton className="h-3 w-full" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : !reqCount || Number(reqCount as bigint) === 0 ? (
             <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>{t("noRequests")}</div>
           ) : (
             <div className="overflow-x-auto">
@@ -114,7 +142,7 @@ export default function WithdrawalsPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="py-3 az-mono" colSpan={5} style={{ color: "var(--muted)" }}>Loading on-chain requests…</td>
+                    <td className="py-3 az-mono" colSpan={5} style={{ color: "var(--muted)" }}>No requests found.</td>
                   </tr>
                 </tbody>
               </table>

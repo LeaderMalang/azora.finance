@@ -3,7 +3,9 @@
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { ConnectModal } from "@/components/app/ConnectModal";
 import { ToastProvider } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
 import { useAccount } from "wagmi";
+import { useState, useEffect } from "react";
 
 function WrongNetworkBanner() {
   const { isConnected, chainId } = useAccount();
@@ -25,15 +27,22 @@ function WrongNetworkBanner() {
 
 function AppShell({ children, locale }: { children: React.ReactNode; locale: string }) {
   const { isConnected } = useAccount();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <ToastProvider>
-      {!isConnected && <ConnectModal />}
+      {mounted && !isConnected && <ConnectModal />}
       <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
         <AppSidebar locale={locale} />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <WrongNetworkBanner />
-          {children}
+          {!mounted ? (
+            <div className="flex flex-1 items-center justify-center" style={{ minHeight: "60vh" }}>
+              <Spinner size="lg" />
+            </div>
+          ) : children}
         </div>
       </div>
     </ToastProvider>

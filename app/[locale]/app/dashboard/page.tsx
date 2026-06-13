@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract } from "wagmi";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
@@ -20,6 +21,16 @@ function KpiCard({ label, value, unit, sub, glow }: { label: string; value: stri
   );
 }
 
+function SkeletonKpiCard() {
+  return (
+    <div className="az-card space-y-3">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="h-3 w-24" />
+    </div>
+  );
+}
+
 const RATE_PER_SEC = 0.007 / 86400;
 
 export default function DashboardPage() {
@@ -27,7 +38,7 @@ export default function DashboardPage() {
   const { address: addr } = useAccount();
   const { chainId } = useActiveChain();
 
-  const { data: userInfo } = useReadContract({
+  const { data: userInfo, isLoading: userLoading } = useReadContract({
     address: CONTRACTS[chainId].staking,
     abi: STAKING_ABI,
     functionName: "getUserInfo",
@@ -62,18 +73,45 @@ export default function DashboardPage() {
   const unlockTime = userInfo ? new Date(Number(userInfo[6] as bigint) * 1000).toLocaleDateString() : "—";
   const lockProgress = userInfo && hasStake ? Math.min(100, Math.round(((Date.now() / 1000 - Number(userInfo[4] as bigint)) / (Number(userInfo[6] as bigint) - Number(userInfo[4] as bigint))) * 100)) : 0;
 
+  const loading = userLoading && !!addr;
+
   return (
     <>
       <AppTopbar title={t("title")} sub="Your positions, earnings & rewards" />
       <div className="p-8 max-w-app">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? "1 active position" : "No active stake"} glow />
-          <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
-          <KpiCard label={t("portfolio")} value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" />
-          <KpiCard label={t("referralEarnings")} value="—" unit="AZR" />
+          {loading ? (
+            <>
+              <SkeletonKpiCard />
+              <SkeletonKpiCard />
+              <SkeletonKpiCard />
+              <SkeletonKpiCard />
+            </>
+          ) : (
+            <>
+              <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? "1 active position" : "No active stake"} glow />
+              <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
+              <KpiCard label={t("portfolio")} value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" />
+              <KpiCard label={t("referralEarnings")} value="—" unit="AZR" />
+            </>
+          )}
         </div>
 
-        {hasStake && (
+        {loading ? (
+          <div className="az-card mb-6">
+            <Skeleton className="h-5 w-32 mb-5" />
+            <div className="space-y-4">
+              {[0, 1].map((i) => (
+                <div key={i} className="grid grid-cols-4 gap-4">
+                  <Skeleton className="h-4" />
+                  <Skeleton className="h-4" />
+                  <Skeleton className="h-4" />
+                  <Skeleton className="h-4" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : hasStake ? (
           <div className="az-card mb-6">
             <h3 className="font-semibold mb-4">{t("activeStakes")}</h3>
             <div className="overflow-x-auto">
@@ -102,9 +140,7 @@ export default function DashboardPage() {
               </table>
             </div>
           </div>
-        )}
-
-        {!hasStake && (
+        ) : (
           <div className="az-card flex flex-col items-center py-12 text-center">
             <p className="mb-4" style={{ color: "var(--text-2)" }}>{t("noStakes")}</p>
             <a href="../stake" className="az-btn-primary">{t("goStake")}</a>
