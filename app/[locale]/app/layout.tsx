@@ -36,7 +36,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const { data: userInfo } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
-    functionName: "getUserInfo",
+    functionName: "usersByAddress",
     args: addr ? [addr] : undefined,
     chainId: targetChain.id,
     query: { enabled: !!addr && isConnected, retry: 3 },

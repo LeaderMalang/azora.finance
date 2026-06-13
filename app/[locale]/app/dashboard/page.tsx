@@ -41,7 +41,7 @@ export default function DashboardPage() {
   const { data: userInfo, isLoading: userLoading } = useReadContract({
     address: CONTRACTS[chainId].staking,
     abi: STAKING_ABI,
-    functionName: "getUserInfo",
+    functionName: "usersByAddress",
     args: addr ? [addr] : undefined,
     query: { enabled: !!addr },
   });

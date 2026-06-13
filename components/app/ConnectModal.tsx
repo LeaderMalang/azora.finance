@@ -45,7 +45,7 @@ export function ConnectModal() {
   } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
-    functionName: "getUserInfo",
+    functionName: "usersByAddress",
     args: addr ? [addr] : undefined,
     chainId: targetChain.id,
     query: {

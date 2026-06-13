@@ -25,7 +25,7 @@ export default function StakePage() {
   const { data: azrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: minStake } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "minStakeAmount", query: { enabled: true } });
   const { data: lockPeriod } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "lockPeriod", query: { enabled: true } });
-  const { data: userInfo } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "getUserInfo", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: userInfo } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "usersByAddress", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
 
   const azrBalance = azrBal ? parseFloat(formatUnits(azrBal as bigint, 18)) : 0;
   const minStakeAmt = minStake ? parseFloat(formatUnits(minStake as bigint, 18)) : 50;
