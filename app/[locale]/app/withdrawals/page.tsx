@@ -19,6 +19,7 @@ export default function WithdrawalsPage() {
 
   const [asset, setAsset] = useState<0 | 1>(0); // 0=AZR 1=USDT
   const [amount, setAmount] = useState("");
+  const [inputErr, setInputErr] = useState("");
 
   const { writeContractAsync, data: txHash } = useWriteContract();
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
@@ -36,6 +37,7 @@ export default function WithdrawalsPage() {
 
   const doRequest = async () => {
     if (!addr || !amount || parseFloat(amount) <= 0) return;
+    if (parseFloat(amount) > bal) { setInputErr(`Insufficient balance (max ${bal.toFixed(2)} ${assetLabel})`); return; }
     const parsed = parseUnits(amount, 18);
     const tokenAddr = asset === 0 ? CONTRACTS[chainId].azoraToken : CONTRACTS[chainId].usdt;
     try {
@@ -81,7 +83,7 @@ export default function WithdrawalsPage() {
                   Bal: {balLoading && !!addr ? <Skeleton className="inline-block w-16 h-3" /> : `${bal.toFixed(2)} ${assetLabel}`}
                 </span>
               </div>
-              <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setInputErr(""); }} />
             </div>
             <div className="space-y-2 mb-5 text-sm">
               <div className="flex justify-between">
@@ -93,6 +95,7 @@ export default function WithdrawalsPage() {
                 <span className="az-mono text-teal">{youGet.toFixed(4)} {assetLabel}</span>
               </div>
             </div>
+            {inputErr && <p className="text-xs mb-3" style={{ color: "#ff6b6b" }}>{inputErr}</p>}
             <button className="az-btn-primary w-full" onClick={doRequest} disabled={confirming || !amount}>
               {confirming ? t("submitting") : t("submit")}
             </button>

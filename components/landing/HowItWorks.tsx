@@ -23,7 +23,7 @@ export function HowItWorks() {
       <div className="mx-auto max-w-site px-6">
         <div className="mb-14 max-w-xl reveal">
           <span className="az-mono text-xs tracking-widest uppercase text-teal mb-3 block">{t("title")}</span>
-          <h2 className="font-display font-bold mb-4" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>Three phases. Zero manual intervention.</h2>
+          <h2 className="font-display font-bold mb-4" style={{ fontSize: "clamp(34px,5vw,56px)", letterSpacing: "-0.03em" }}>Three steps. Completely on-chain.</h2>
           <p style={{ color: "var(--text-2)" }}>{t("sub")}</p>
         </div>
 

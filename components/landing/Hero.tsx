@@ -18,7 +18,7 @@ function LiveCard() {
   return (
     <div className="az-card-glow relative overflow-hidden">
       <div className="flex items-center justify-between mb-4">
-        <span className="az-mono text-[11px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>AI MONITOR · AZR</span>
+        <span className="az-mono text-[11px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>AZORA MONITOR · AZR</span>
         <span className="flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-mono" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}>
           <span className="w-1.5 h-1.5 rounded-full bg-teal animate-glow-pulse" />
           LIVE
@@ -32,13 +32,13 @@ function LiveCard() {
           +{RATE_PER_SEC.toFixed(4)}/s
         </span>
       </div>
-      <p className="text-xs mb-5" style={{ color: "var(--muted)" }}>AI-monitored stake · accruing 0.7% / day</p>
+      <p className="text-xs mb-5" style={{ color: "var(--muted)" }}>Azora stake · accruing 0.7% / day</p>
       <div className="h-12 mb-5 overflow-hidden opacity-60">
         <Sparkline />
       </div>
       <div className="grid grid-cols-3 gap-3 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
         {[
-          { k: "AI daily yield", v: "+87.36", up: true },
+          { k: "Daily yield", v: "+87.36", up: true },
           { k: "Unlocks in", v: "128d" },
           { k: "Referral", v: "+412", up: true },
         ].map((s) => (
@@ -72,7 +72,7 @@ export function Hero({ locale }: { locale: string }) {
   const t = useTranslations("hero");
 
   return (
-    <section className="relative min-h-screen flex items-center pt-24 pb-16">
+    <section className="relative min-h-screen flex items-center pt-8 pb-16">
       <div className="mx-auto w-full max-w-site px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -85,12 +85,11 @@ export function Hero({ locale }: { locale: string }) {
               style={{ fontSize: "clamp(44px,6.6vw,84px)", letterSpacing: "-0.035em" }}
             >
               Stake AZR.<br />
-              Powered by{" "}
               <em
                 className="not-italic"
                 style={{ background: "linear-gradient(135deg, var(--teal) 0%, var(--teal-bright) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
               >
-                AI.
+                Earn Every Day.
               </em>
             </h1>
             <p className="text-lg mb-8 max-w-lg reveal d2" style={{ color: "var(--text-2)" }}>

@@ -2,16 +2,27 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import { useState } from "react";
+import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
+import { useActiveChain } from "@/lib/hooks";
 
 export default function ReferralsPage() {
   const t = useTranslations("referralsPage");
   const { address: addr } = useAccount();
+  const { chainId } = useActiveChain();
   const [copied, setCopied] = useState(false);
 
+  const { data: userInfo } = useReadContract({
+    address: CONTRACTS[chainId].staking,
+    abi: STAKING_ABI,
+    functionName: "usersByAddress",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr },
+  });
+  const username = (userInfo?.[1] as string) ?? "";
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://azora.finance";
-  const username = ""; // TODO: fetch from DB/contract
   const refLink = username ? `${appUrl}?ref=${username}` : `${appUrl}?ref=${addr?.slice(0, 8) ?? ""}`;
 
   const copy = () => {

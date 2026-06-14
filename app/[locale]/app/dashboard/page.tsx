@@ -8,6 +8,8 @@ import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits } from "viem";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
 function KpiCard({ label, value, unit, sub, glow }: { label: string; value: string; unit?: string; sub?: string; glow?: boolean }) {
   return (
@@ -37,43 +39,38 @@ export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { address: addr } = useAccount();
   const { chainId } = useActiveChain();
+  const { locale } = useParams<{ locale: string }>();
 
-  const { data: userInfo, isLoading: userLoading } = useReadContract({
+  type StakePosition = { id: bigint; amount: bigint; startTime: bigint; lastClaimTime: bigint; unlockTime: bigint; active: boolean };
+
+  const { data: rawPositions, isLoading: posLoading } = useReadContract({
     address: CONTRACTS[chainId].staking,
     abi: STAKING_ABI,
-    functionName: "usersByAddress",
-    args: addr ? [addr] : undefined,
-    query: { enabled: !!addr },
-  });
-
-  useReadContract({
-    address: CONTRACTS[chainId].staking,
-    abi: STAKING_ABI,
-    functionName: "getPendingRewards",
+    functionName: "getUserStakes",
     args: addr ? [addr] : undefined,
     query: { enabled: !!addr },
   });
 
   const [pendingDisplay, setPendingDisplay] = useState<string>("0.0000");
 
+  const positions: StakePosition[] = (rawPositions as StakePosition[] | undefined) ?? [];
+  const activePositions = positions.filter((p) => p.active);
+  const staked = activePositions.reduce((s, p) => s + parseFloat(formatUnits(p.amount, 18)), 0);
+  const hasStake = activePositions.length > 0;
+
   useEffect(() => {
-    if (!userInfo || !userInfo[3]) return;
-    const stakedBig = BigInt(userInfo[3] as bigint);
-    const lastClaim = Number(userInfo[5] as bigint) * 1000;
+    if (!hasStake) return;
     const id = setInterval(() => {
-      const elapsed = (Date.now() - lastClaim) / 1000;
-      const pending = parseFloat(formatUnits(stakedBig, 18)) * RATE_PER_SEC * elapsed;
-      setPendingDisplay(pending.toFixed(4));
+      const total = activePositions.reduce((sum, pos) => {
+        const elapsed = (Date.now() / 1000) - Number(pos.lastClaimTime);
+        return sum + parseFloat(formatUnits(pos.amount, 18)) * RATE_PER_SEC * elapsed;
+      }, 0);
+      setPendingDisplay(total.toFixed(4));
     }, 1000);
     return () => clearInterval(id);
-  }, [userInfo]);
+  }, [rawPositions]);
 
-  const staked = userInfo ? parseFloat(formatUnits(userInfo[3] as bigint, 18)) : 0;
-  const hasStake = userInfo ? (userInfo[7] as boolean) : false;
-  const unlockTime = userInfo ? new Date(Number(userInfo[6] as bigint) * 1000).toLocaleDateString() : "—";
-  const lockProgress = userInfo && hasStake ? Math.min(100, Math.round(((Date.now() / 1000 - Number(userInfo[4] as bigint)) / (Number(userInfo[6] as bigint) - Number(userInfo[4] as bigint))) * 100)) : 0;
-
-  const loading = userLoading && !!addr;
+  const loading = posLoading && !!addr;
 
   return (
     <>
@@ -113,29 +110,38 @@ export default function DashboardPage() {
           </div>
         ) : hasStake ? (
           <div className="az-card mb-6">
-            <h3 className="font-semibold mb-4">{t("activeStakes")}</h3>
+            <h3 className="font-semibold mb-4">{t("activeStakes")} ({activePositions.length})</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                    <th className="text-left pb-3 font-normal">#</th>
                     <th className="text-left pb-3 font-normal">Amount</th>
-                    <th className="text-left pb-3 font-normal">Pending</th>
                     <th className="text-left pb-3 font-normal">Unlocks</th>
                     <th className="text-left pb-3 font-normal">Progress</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td className="py-3 font-semibold az-mono">{staked.toFixed(2)} AZR</td>
-                    <td className="py-3 az-mono" style={{ color: "var(--teal)" }}>{pendingDisplay}</td>
-                    <td className="py-3 az-mono" style={{ color: "var(--text-2)" }}>{unlockTime}</td>
-                    <td className="py-3 w-32">
-                      <div className="prog-bar">
-                        <div className="prog-fill" style={{ width: `${lockProgress}%` }} />
-                      </div>
-                      <div className="text-[11px] mt-1 az-mono" style={{ color: "var(--muted)" }}>{lockProgress}%</div>
-                    </td>
-                  </tr>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {activePositions.map((pos) => {
+                    const now = Date.now() / 1000;
+                    const start = Number(pos.startTime);
+                    const unlock = Number(pos.unlockTime);
+                    const progress = Math.min(100, Math.round(((now - start) / (unlock - start)) * 100));
+                    const unlocked = now >= unlock;
+                    return (
+                      <tr key={pos.id.toString()}>
+                        <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(pos.id)}</td>
+                        <td className="py-3 font-semibold az-mono">{parseFloat(formatUnits(pos.amount, 18)).toFixed(2)} AZR</td>
+                        <td className="py-3 az-mono text-xs" style={{ color: unlocked ? "var(--teal)" : "var(--text-2)" }}>
+                          {unlocked ? "Unlocked ✓" : new Date(unlock * 1000).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 w-32">
+                          <div className="prog-bar"><div className="prog-fill" style={{ width: `${progress}%` }} /></div>
+                          <div className="text-[11px] mt-1 az-mono" style={{ color: "var(--muted)" }}>{progress}%</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -143,9 +149,68 @@ export default function DashboardPage() {
         ) : (
           <div className="az-card flex flex-col items-center py-12 text-center">
             <p className="mb-4" style={{ color: "var(--text-2)" }}>{t("noStakes")}</p>
-            <a href="../stake" className="az-btn-primary">{t("goStake")}</a>
+            <Link href={`/${locale}/app/stake`} className="az-btn-primary">{t("goStake")}</Link>
           </div>
         )}
+
+        {/* Partner logos strip */}
+        <div className="az-card mt-2">
+          <p className="text-xs az-mono mb-5 text-center uppercase tracking-widest" style={{ color: "var(--muted)" }}>Trusted Ecosystem Partners</p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {[
+              {
+                name: "BNB Chain",
+                logo: (
+                  <svg viewBox="0 0 32 32" className="w-7 h-7" fill="none">
+                    <circle cx="16" cy="16" r="16" fill="#F0B90B" />
+                    <path d="M12 16l4-4 4 4-4 4-4-4zm-4 0l4 4V16l-4-4v4zm12-4v4l4-4-4-4v4zm-4 8l-4-4 4 4 4-4-4 4z" fill="white" opacity="0.9" />
+                  </svg>
+                ),
+              },
+              {
+                name: "Tether",
+                logo: (
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: "#26A17B", color: "white" }}>₮</span>
+                ),
+              },
+              {
+                name: "MetaMask",
+                logo: (
+                  <svg viewBox="0 0 32 32" className="w-7 h-7" fill="none">
+                    <path d="M28 4L17.5 11.8l1.9-4.5L28 4z" fill="#E17726" />
+                    <path d="M4 4l10.4 7.9-1.8-4.6L4 4z" fill="#E27625" />
+                    <path d="M24 22.4l-2.8 4.3 6 1.7 1.7-5.8-4.9-.2z" fill="#E27625" />
+                    <path d="M3.1 22.6l1.7 5.8 6-1.7-2.8-4.3-4.9.2z" fill="#E27625" />
+                    <circle cx="16" cy="16" r="5" fill="#E27625" opacity="0.3" />
+                  </svg>
+                ),
+              },
+              {
+                name: "Trust Wallet",
+                logo: (
+                  <svg viewBox="0 0 32 32" className="w-7 h-7" fill="none">
+                    <circle cx="16" cy="16" r="16" fill="#3375BB" />
+                    <path d="M16 7l8 3.5v6c0 4.4-3.4 8.3-8 9.5-4.6-1.2-8-5.1-8-9.5v-6L16 7z" fill="white" opacity="0.9" />
+                  </svg>
+                ),
+              },
+              {
+                name: "WalletConnect",
+                logo: (
+                  <svg viewBox="0 0 32 32" className="w-7 h-7" fill="none">
+                    <circle cx="16" cy="16" r="16" fill="#3B99FC" />
+                    <path d="M9.6 13.2c3.5-3.5 9.3-3.5 12.8 0l.4.4-1.5 1.5-.4-.4c-2.5-2.5-6.4-2.5-8.9 0l-.5.4-1.5-1.5.6-.4zm6.4 3.4l2.1 2.1-2.1 2.1-2.1-2.1 2.1-2.1z" fill="white" />
+                  </svg>
+                ),
+              },
+            ].map((p) => (
+              <div key={p.name} className="flex flex-col items-center gap-2">
+                {p.logo}
+                <span className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>{p.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </>
   );

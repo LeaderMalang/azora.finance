@@ -4,12 +4,27 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+
+const LANGS = [
+  { code: "en", label: "EN" },
+  { code: "es", label: "ES" },
+  { code: "zh", label: "中文" },
+  { code: "ar", label: "عربي" },
+];
 
 export function LandingNav({ locale }: { locale: string }) {
   const t = useTranslations("nav");
   const { theme, setTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const switchLang = (lang: string) => {
+    const newPath = pathname.replace(`/${locale}`, `/${lang}`);
+    router.push(newPath);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -52,6 +67,25 @@ export function LandingNav({ locale }: { locale: string }) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-3">
+          {mounted && (
+            <div className="hidden md:flex items-center gap-1">
+              {LANGS.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => switchLang(lang.code)}
+                  className="px-2.5 py-1.5 rounded-ctl text-xs font-semibold az-mono transition-all"
+                  style={{
+                    borderColor: locale === lang.code ? "var(--teal)" : "var(--line)",
+                    border: "1px solid",
+                    color: locale === lang.code ? "var(--teal)" : "var(--text-2)",
+                    background: locale === lang.code ? "rgba(45,212,191,0.06)" : "transparent",
+                  }}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          )}
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

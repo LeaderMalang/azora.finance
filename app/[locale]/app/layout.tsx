@@ -4,8 +4,10 @@ import { AppSidebar } from "@/components/app/AppSidebar";
 import { ConnectModal } from "@/components/app/ConnectModal";
 import { ToastProvider } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
+import { SupportButton } from "@/components/ui/SupportButton";
 import { useAccount, useReadContract } from "wagmi";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
 
@@ -30,8 +32,18 @@ function WrongNetworkBanner() {
 function AppShell({ children, locale }: { children: React.ReactNode; locale: string }) {
   const { isConnected, address: addr } = useAccount();
   const [mounted, setMounted] = useState(false);
+  const [wasConnected, setWasConnected] = useState(false);
+  const router = useRouter();
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (isConnected) {
+      setWasConnected(true);
+    } else if (wasConnected && mounted) {
+      router.push(`/${locale}`);
+    }
+  }, [isConnected, mounted]);
 
   const { data: userInfo } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
@@ -41,17 +53,29 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
     chainId: targetChain.id,
     query: { enabled: !!addr && isConnected, retry: 3 },
   });
-  const isRegistered = Boolean(userInfo?.[2]);
 
-  // Show modal whenever the user is not yet confirmed as registered.
-  // ConnectModal handles the verifying/error/claim states internally.
-  const showModal = mounted && !isRegistered;
+  const { data: ownerAddr } = useReadContract({
+    address: CONTRACTS[targetChain.id as 56 | 97].staking,
+    abi: STAKING_ABI,
+    functionName: "owner",
+    chainId: targetChain.id,
+    query: { enabled: true },
+  });
+
+  const isRegistered = Boolean(userInfo?.[2]);
+  const username = (userInfo?.[1] as string) ?? "";
+  const isOwner = !!addr && !!ownerAddr && addr.toLowerCase() === (ownerAddr as string).toLowerCase();
+
+  // Only show modal when wallet is connected but user is not yet registered.
+  // Unconnected visitors can browse freely (F1 — wallet-less access).
+  const showModal = mounted && isConnected && !isRegistered;
 
   return (
     <ToastProvider>
       {showModal && <ConnectModal />}
+      <SupportButton />
       <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
-        <AppSidebar locale={locale} />
+        <AppSidebar locale={locale} username={username} isOwner={isOwner} />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <WrongNetworkBanner />
           {!mounted ? (

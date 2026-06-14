@@ -9,6 +9,8 @@ import { Features } from "@/components/landing/Features";
 import { ReferralProgram } from "@/components/landing/ReferralProgram";
 import { FAQ } from "@/components/landing/FAQ";
 import { CTABand } from "@/components/landing/CTABand";
+import { Partners } from "@/components/landing/Partners";
+import { PriceTicker } from "@/components/landing/PriceTicker";
 import { Footer } from "@/components/landing/Footer";
 
 export default async function LandingPage({ params }: { params: { locale: string } }) {
@@ -18,6 +20,9 @@ export default async function LandingPage({ params }: { params: { locale: string
     <>
       <AuroraBackground />
       <LandingNav locale={locale} />
+      <div className="pt-[73px]">
+        <PriceTicker />
+      </div>
       <main>
         <Hero locale={locale} />
         <StatsBar />
@@ -26,6 +31,7 @@ export default async function LandingPage({ params }: { params: { locale: string
         <Features />
         <ReferralProgram />
         <FAQ />
+        <Partners />
         <CTABand locale={locale} />
       </main>
       <Footer locale={locale} />

@@ -22,7 +22,7 @@ const NAV = [
   { key: "withdrawals", icon: '<path d="M12 3v12M8 11l4 4 4-4M5 21h14"/>' },
 ];
 
-export function AppSidebar({ locale }: { locale: string }) {
+export function AppSidebar({ locale, username, isOwner }: { locale: string; username: string; isOwner: boolean }) {
   const t = useTranslations("app");
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -40,6 +40,7 @@ export function AppSidebar({ locale }: { locale: string }) {
     stake: t("stake"),
     referrals: t("referrals"),
     withdrawals: t("withdrawals"),
+    admin: "Admin",
   };
 
   return (
@@ -58,7 +59,7 @@ export function AppSidebar({ locale }: { locale: string }) {
       </div>
 
       <nav className="flex-1 px-3 space-y-1 py-2">
-        {NAV.map((item) => {
+        {[...NAV, ...(isOwner ? [{ key: "admin", icon: '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z"/><path d="M12 8v4M12 16h.01"/>' }] : [])].map((item) => {
           const href = `/${locale}/app/${item.key}`;
           const isActive = pathname.includes(`/app/${item.key}`);
           return (
@@ -83,7 +84,7 @@ export function AppSidebar({ locale }: { locale: string }) {
           >
             <div className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, var(--teal), var(--teal-deep))" }} />
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>wallet.azr</div>
+              <div className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{username || short}</div>
               <div className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>{short}</div>
             </div>
           </div>
