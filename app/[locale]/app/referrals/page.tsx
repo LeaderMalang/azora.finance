@@ -34,7 +34,7 @@ export default function ReferralsPage() {
   return (
     <>
       <AppTopbar title={t("title")} sub="3-level commissions paid in AZR" />
-      <div className="p-8 max-w-app">
+      <div className="p-4 md:p-8 max-w-app">
         <div className="az-card mb-6">
           <h3 className="font-semibold mb-4">{t("yourLink")}</h3>
           <div className="flex gap-2">
@@ -50,7 +50,7 @@ export default function ReferralsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           {[
             { label: t("l1Earnings"), pct: "5%" },
             { label: t("l2Earnings"), pct: "3%" },

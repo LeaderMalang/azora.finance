@@ -133,7 +133,7 @@ export default function StakePage() {
   return (
     <>
       <AppTopbar title={t("title")} sub={`Lock AZR for ${lockDays} days · 0.7% daily`} />
-      <div className="p-8 max-w-app">
+      <div className="p-4 md:p-8 max-w-app">
 
         {/* New stake form */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

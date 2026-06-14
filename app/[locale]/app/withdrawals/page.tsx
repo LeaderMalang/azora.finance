@@ -53,7 +53,7 @@ export default function WithdrawalsPage() {
   return (
     <>
       <AppTopbar title={t("title")} sub="Request & track payout queue" />
-      <div className="p-8 max-w-app">
+      <div className="p-4 md:p-8 max-w-app">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="az-card">
             <h3 className="font-semibold mb-5">{t("request")}</h3>

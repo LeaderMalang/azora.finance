@@ -53,7 +53,7 @@ export default function AdminPage() {
     return (
       <>
         <AppTopbar title="Admin" sub="Owner-only controls" />
-        <div className="p-8 flex items-center justify-center" style={{ minHeight: "50vh" }}>
+        <div className="p-4 md:p-8 flex items-center justify-center" style={{ minHeight: "50vh" }}>
           <p style={{ color: "var(--text-2)" }}>Connect your wallet to access this page.</p>
         </div>
       </>
@@ -64,7 +64,7 @@ export default function AdminPage() {
     return (
       <>
         <AppTopbar title="Admin" sub="Owner-only controls" />
-        <div className="p-8 flex flex-col items-center justify-center gap-4" style={{ minHeight: "50vh" }}>
+        <div className="p-4 md:p-8 flex flex-col items-center justify-center gap-4" style={{ minHeight: "50vh" }}>
           <svg className="w-12 h-12" style={{ color: "#ef4444" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" />
           </svg>
@@ -89,12 +89,12 @@ export default function AdminPage() {
   return (
     <>
       <AppTopbar title="Admin Panel" sub="Owner-only contract controls · handle with care" />
-      <div className="p-8 max-w-app space-y-6">
+      <div className="p-4 md:p-8 max-w-app space-y-6">
 
         {/* Status strip */}
         <div className="az-card-glow">
           <h3 className="font-semibold mb-4 text-sm">Current Protocol State</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: "Lock Period", value: lockPeriod ? `${Math.floor(Number(lockPeriod as bigint) / 86400)} days` : "—" },
               { label: "Min Stake", value: minStake ? `${parseFloat(formatUnits(minStake as bigint, 18)).toFixed(0)} AZR` : "—" },
@@ -177,7 +177,7 @@ export default function AdminPage() {
             <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
               Current: L1={l1Rate ? Number(l1Rate as bigint) / 100 : "—"}% · L2={l2Rate ? Number(l2Rate as bigint) / 100 : "—"}% · L3={l3Rate ? Number(l3Rate as bigint) / 100 : "—"}%
             </p>
-            <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>L1 bps</label>
                 <input className="az-input" placeholder="500" value={l1Input} onChange={(e) => setL1Input(e.target.value)} type="number" />

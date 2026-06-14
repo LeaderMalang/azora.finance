@@ -63,7 +63,7 @@ export default function SwapPage() {
   return (
     <>
       <AppTopbar title={t("title")} sub="Exchange USDT ↔ AZR · 1:1 reserve rate" />
-      <div className="p-8 max-w-app">
+      <div className="p-4 md:p-8 max-w-app">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
           {/* Promo panel */}

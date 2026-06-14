@@ -75,8 +75,8 @@ export default function DashboardPage() {
   return (
     <>
       <AppTopbar title={t("title")} sub="Your positions, earnings & rewards" />
-      <div className="p-8 max-w-app">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="p-4 md:p-8 max-w-app">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {loading ? (
             <>
               <SkeletonKpiCard />

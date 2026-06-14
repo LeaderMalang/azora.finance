@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useAccount, useDisconnect } from "wagmi";
 import { useEffect, useState } from "react";
 import { NetworkSwitcher } from "./NetworkSwitcher";
+import { useSidebar } from "./SidebarContext";
 
 const NAV = [
   {
@@ -29,6 +30,7 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
   const { address: addr } = useAccount();
   const { disconnect } = useDisconnect();
   const [mounted, setMounted] = useState(false);
+  const { open, toggle } = useSidebar();
 
   useEffect(() => setMounted(true), []);
 
@@ -43,13 +45,28 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
     admin: "Admin",
   };
 
+  const allNav = [
+    ...NAV,
+    ...(isOwner ? [{ key: "admin", icon: '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z"/><path d="M12 8v4M12 16h.01"/>' }] : []),
+  ];
+
   return (
     <aside
-      className="flex flex-col h-full w-56 border-r"
+      className={[
+        "flex flex-col h-full w-64 border-r",
+        "fixed md:relative inset-y-0 left-0 z-50",
+        "transition-transform duration-300 ease-out",
+        open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+      ].join(" ")}
       style={{ background: "var(--bg-2)", borderColor: "var(--line)" }}
     >
       <div className="p-5 pb-4">
-        <Link href={`/${locale}`} className="flex items-center gap-2.5 font-display font-semibold text-lg" style={{ color: "var(--text)" }}>
+        <Link
+          href={`/${locale}`}
+          className="flex items-center gap-2.5 font-display font-semibold text-lg"
+          style={{ color: "var(--text)" }}
+          onClick={() => open && toggle()}
+        >
           <svg className="w-7 h-7" viewBox="0 0 32 32" fill="none">
             <path d="M16 2 L29 24 H3 Z" stroke="var(--teal)" strokeWidth="2" strokeLinejoin="round" />
             <path d="M16 11 L22.5 22 H9.5 Z" fill="var(--teal)" />
@@ -59,7 +76,7 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
       </div>
 
       <nav className="flex-1 px-3 space-y-1 py-2">
-        {[...NAV, ...(isOwner ? [{ key: "admin", icon: '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z"/><path d="M12 8v4M12 16h.01"/>' }] : [])].map((item) => {
+        {allNav.map((item) => {
           const href = `/${locale}/app/${item.key}`;
           const isActive = pathname.includes(`/app/${item.key}`);
           return (
@@ -67,8 +84,9 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
               key={item.key}
               href={href}
               className={`side-link ${isActive ? "active" : ""}`}
+              onClick={() => open && toggle()}
             >
-              <svg className="w-4.5 h-4.5 w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: item.icon }} />
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: item.icon }} />
               <span>{labels[item.key]}</span>
             </Link>
           );

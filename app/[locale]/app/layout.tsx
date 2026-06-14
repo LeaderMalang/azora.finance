@@ -5,6 +5,7 @@ import { ConnectModal } from "@/components/app/ConnectModal";
 import { ToastProvider } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { SupportButton } from "@/components/ui/SupportButton";
+import { SidebarContext } from "@/components/app/SidebarContext";
 import { useAccount, useReadContract } from "wagmi";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const { isConnected, address: addr } = useAccount();
   const [mounted, setMounted] = useState(false);
   const [wasConnected, setWasConnected] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => { setMounted(true); }, []);
@@ -66,26 +68,33 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const username = (userInfo?.[1] as string) ?? "";
   const isOwner = !!addr && !!ownerAddr && addr.toLowerCase() === (ownerAddr as string).toLowerCase();
 
-  // Only show modal when wallet is connected but user is not yet registered.
-  // Unconnected visitors can browse freely (F1 — wallet-less access).
   const showModal = mounted && isConnected && !isRegistered;
 
   return (
-    <ToastProvider>
-      {showModal && <ConnectModal />}
-      <SupportButton />
-      <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
-        <AppSidebar locale={locale} username={username} isOwner={isOwner} />
-        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-          <WrongNetworkBanner />
-          {!mounted ? (
-            <div className="flex flex-1 items-center justify-center" style={{ minHeight: "60vh" }}>
-              <Spinner size="lg" />
-            </div>
-          ) : children}
+    <SidebarContext.Provider value={{ open: sidebarOpen, toggle: () => setSidebarOpen((p) => !p) }}>
+      <ToastProvider>
+        {showModal && <ConnectModal />}
+        <SupportButton />
+        {/* Mobile overlay — closes sidebar when tapping outside */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+          <AppSidebar locale={locale} username={username} isOwner={isOwner} />
+          <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            <WrongNetworkBanner />
+            {!mounted ? (
+              <div className="flex flex-1 items-center justify-center" style={{ minHeight: "60vh" }}>
+                <Spinner size="lg" />
+              </div>
+            ) : children}
+          </div>
         </div>
-      </div>
-    </ToastProvider>
+      </ToastProvider>
+    </SidebarContext.Provider>
   );
 }
 
