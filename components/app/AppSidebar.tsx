@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { useAccount, useDisconnect } from "wagmi";
+import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useEffect, useState } from "react";
 import { NetworkSwitcher } from "./NetworkSwitcher";
 import { useSidebar } from "./SidebarContext";
@@ -29,6 +30,7 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
   const { theme, setTheme } = useTheme();
   const { address: addr } = useAccount();
   const { disconnect } = useDisconnect();
+  const { open: openWalletModal } = useWeb3Modal();
   const [mounted, setMounted] = useState(false);
   const { open, toggle } = useSidebar();
 
@@ -95,42 +97,69 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
 
       <div className="p-3 border-t space-y-2" style={{ borderColor: "var(--line)" }}>
         <NetworkSwitcher />
-        {addr && (
-          <div
-            className="flex items-center gap-3 rounded-ctl px-3 py-2.5"
-            style={{ background: "var(--elevated)" }}
-          >
-            <div className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, var(--teal), var(--teal-deep))" }} />
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{username || short}</div>
-              <div className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>{short}</div>
-            </div>
-          </div>
-        )}
-        <div className="flex gap-2">
-          {mounted && (
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex-1 flex items-center justify-center h-9 rounded-ctl border transition-colors hover:border-teal"
-              style={{ borderColor: "var(--line)", color: "var(--text-2)" }}
-              aria-label="Toggle theme"
+        {addr ? (
+          <>
+            <div
+              className="flex items-center gap-3 rounded-ctl px-3 py-2.5"
+              style={{ background: "var(--elevated)" }}
             >
-              {theme === "dark" ? (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
-              ) : (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" /></svg>
+              <div className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, var(--teal), var(--teal-deep))" }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{username || short}</div>
+                <div className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>{short}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {mounted && (
+                <button
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="flex-1 flex items-center justify-center h-9 rounded-ctl border transition-colors hover:border-teal"
+                  style={{ borderColor: "var(--line)", color: "var(--text-2)" }}
+                  aria-label="Toggle theme"
+                >
+                  {theme === "dark" ? (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" /></svg>
+                  )}
+                </button>
               )}
+              <button
+                onClick={() => disconnect()}
+                className="flex-1 flex items-center justify-center h-9 rounded-ctl border text-xs az-mono transition-colors hover:border-danger"
+                style={{ borderColor: "var(--line)", color: "var(--muted)" }}
+                title={t("disconnect")}
+              >
+                ⏻
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => openWalletModal()}
+              className="az-btn-primary w-full text-sm"
+            >
+              Connect Wallet
             </button>
-          )}
-          <button
-            onClick={() => disconnect()}
-            className="flex-1 flex items-center justify-center h-9 rounded-ctl border text-xs az-mono transition-colors hover:border-danger"
-            style={{ borderColor: "var(--line)", color: "var(--muted)" }}
-            title={t("disconnect")}
-          >
-            ⏻
-          </button>
-        </div>
+            {mounted && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="flex-1 flex items-center justify-center h-9 rounded-ctl border transition-colors hover:border-teal"
+                  style={{ borderColor: "var(--line)", color: "var(--text-2)" }}
+                  aria-label="Toggle theme"
+                >
+                  {theme === "dark" ? (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" /></svg>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </aside>
   );
