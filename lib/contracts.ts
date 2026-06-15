@@ -1,7 +1,7 @@
 export const CONTRACTS = {
   97: {
-    azoraToken: "0x643c5b339aCA32BD5C092f3b75a89C365087209D" as `0x${string}`,
-    staking: "0x3989a538D390CDFD0AB701768a3f31345D8F43dc" as `0x${string}`,
+    azoraToken: "0x702e0C75304372A2d277979Ca8D6889eb379a2e5" as `0x${string}`,
+    staking: "0x92b7C477F218998Ef1Fe0a4AB6137eCA49d6DDB5" as `0x${string}`,
     usdt: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd" as `0x${string}`,
   },
   56: {
@@ -100,6 +100,7 @@ export const ERC20_ABI = [
   { name: "approve", type: "function", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "", type: "bool" }] },
   { name: "allowance", type: "function", stateMutability: "view", inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
   { name: "decimals", type: "function", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint8" }] },
+  { name: "transfer", type: "function", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "", type: "bool" }] },
 ] as const;
 
 // Earliest block to scan for events — prevents RPC range-limit errors on BSC

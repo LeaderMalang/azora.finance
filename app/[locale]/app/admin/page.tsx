@@ -2,7 +2,7 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
+import { CONTRACTS, STAKING_ABI, ERC20_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits, isAddress } from "viem";
 import { useState } from "react";
@@ -35,6 +35,8 @@ export default function AdminPage() {
   const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
   const { data: isPaused, refetch: refetchPaused } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "paused", query: { enabled: true } });
   const { data: reqCount, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+  const { data: poolUsdtBal, refetch: refetchPoolBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: [CONTRACTS[chainId].staking], query: { enabled: true } });
+  const { data: adminUsdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
 
   // Batch-fetch all withdrawal requests
   const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
@@ -52,7 +54,23 @@ export default function AdminPage() {
     .map((r) => r.result as WRequest | undefined)
     .filter((r): r is WRequest => !!r);
 
+  // Batch-fetch usernames for each withdrawal requester
+  const { data: usernamesRaw } = useReadContracts({
+    contracts: allRequests.map((req) => ({
+      address: CONTRACTS[chainId].staking as `0x${string}`,
+      abi: STAKING_ABI,
+      functionName: "usersByAddress" as const,
+      args: [req.requester] as [`0x${string}`],
+    })),
+    query: { enabled: allRequests.length > 0 },
+  });
+  const requestUsernames: string[] = (usernamesRaw ?? []).map((r) => {
+    const res = r.result as [string, string, boolean] | undefined;
+    return res?.[1] ?? "";
+  });
+
   // Form state
+  const [usdtDepositAmt, setUsdtDepositAmt] = useState("");
   const [lockDays, setLockDays] = useState("");
   const [minStakeInput, setMinStakeInput] = useState("");
   const [feeInput, setFeeInput] = useState("");
@@ -228,6 +246,37 @@ export default function AdminPage() {
             >Update Rates</button>
           </AdminCard>
 
+          {/* USDT liquidity deposit */}
+          <AdminCard title="Deposit USDT Liquidity">
+            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+              Pool balance: <strong style={{ color: "var(--teal)" }}>{poolUsdtBal ? parseFloat(formatUnits(poolUsdtBal as bigint, 18)).toFixed(2) : "—"} USDT</strong>
+              &nbsp;·&nbsp;Your wallet: {adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)).toFixed(2) : "—"} USDT
+            </p>
+            <div className="flex gap-2">
+              <input
+                className="az-input flex-1"
+                placeholder="USDT amount"
+                value={usdtDepositAmt}
+                onChange={(e) => setUsdtDepositAmt(e.target.value)}
+                type="number"
+              />
+              <button
+                className="az-btn-primary px-4"
+                disabled={confirming || !usdtDepositAmt}
+                onClick={() => exec(
+                  () => writeContractAsync({
+                    address: CONTRACTS[chainId].usdt,
+                    abi: ERC20_ABI,
+                    functionName: "transfer",
+                    args: [CONTRACTS[chainId].staking, parseUnits(usdtDepositAmt, 18)],
+                  }),
+                  `Deposited ${usdtDepositAmt} USDT into pool`,
+                  refetchPoolBal,
+                )}
+              >Deposit</button>
+            </div>
+          </AdminCard>
+
           {/* Debit account */}
           <AdminCard title="Debit User Account">
             <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>Deducts AZR from a user&apos;s staked balance. Enter the wallet address directly.</p>
@@ -312,7 +361,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {allRequests.map((req) => {
+                  {allRequests.map((req, index) => {
                     const ASSET_LABEL = ["AZR", "USDT"];
                     const STATUS_LABEL = ["Pending", "Approved", "Rejected"];
                     const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
@@ -321,7 +370,14 @@ export default function AdminPage() {
                       <tr key={req.id.toString()}>
                         <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
                         <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
-                          {req.requester.slice(0, 6)}…{req.requester.slice(-4)}
+                          {requestUsernames[index] && (
+                            <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--text)" }}>
+                              {requestUsernames[index]}
+                            </div>
+                          )}
+                          <div title={req.requester}>
+                            {req.requester.slice(0, 8)}…{req.requester.slice(-6)}
+                          </div>
                         </td>
                         <td className="py-3 text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</td>
                         <td className="py-3 font-semibold az-mono">
