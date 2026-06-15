@@ -22,6 +22,11 @@ export default function ReferralsPage() {
   });
   const username = (userInfo?.[1] as string) ?? "";
 
+  const { data: l1Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL1", query: { enabled: true } });
+  const { data: l2Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL2", query: { enabled: true } });
+  const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
+  const fmtRate = (r: unknown) => r !== undefined ? `${(Number(r as bigint) / 100).toFixed(1)}%` : "—";
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://azora.finance";
   const refLink = username ? `${appUrl}?ref=${username}` : `${appUrl}?ref=${addr?.slice(0, 8) ?? ""}`;
 
@@ -52,9 +57,9 @@ export default function ReferralsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           {[
-            { label: t("l1Earnings"), pct: "5%" },
-            { label: t("l2Earnings"), pct: "3%" },
-            { label: t("l3Earnings"), pct: "2%" },
+            { label: t("l1Earnings"), pct: fmtRate(l1Rate) },
+            { label: t("l2Earnings"), pct: fmtRate(l2Rate) },
+            { label: t("l3Earnings"), pct: fmtRate(l3Rate) },
           ].map((c, i) => (
             <div key={i} className="az-card text-center">
               <div className="font-display font-bold text-3xl mb-1 text-teal">{c.pct}</div>

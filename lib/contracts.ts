@@ -16,6 +16,7 @@ export const STAKING_ABI = [
   { name: "registerUser", type: "function", stateMutability: "nonpayable", inputs: [{ name: "username", type: "string" }, { name: "referralUsername", type: "string" }], outputs: [] },
   { name: "isUsernameTaken", type: "function", stateMutability: "view", inputs: [{ name: "username", type: "string" }], outputs: [{ name: "", type: "bool" }] },
   { name: "addressByUsername", type: "function", stateMutability: "view", inputs: [{ name: "", type: "string" }], outputs: [{ name: "", type: "address" }] },
+  { name: "referredBy", type: "function", stateMutability: "view", inputs: [{ name: "username", type: "string" }], outputs: [{ name: "", type: "string" }] },
 
   // ── User info (registration only — no stake fields) ───────────────────────
   {
@@ -100,6 +101,9 @@ export const ERC20_ABI = [
   { name: "allowance", type: "function", stateMutability: "view", inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
   { name: "decimals", type: "function", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint8" }] },
 ] as const;
+
+// Earliest block to scan for events — prevents RPC range-limit errors on BSC
+export const STAKING_DEPLOY_BLOCK = BigInt(47_000_000);
 
 export const REWARDS_CLAIMED_EVENT = {
   name: "RewardsClaimed",

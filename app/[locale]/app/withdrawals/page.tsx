@@ -3,13 +3,25 @@
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 
+type WRequest = {
+  id: bigint;
+  requester: `0x${string}`;
+  amount: bigint;
+  assetType: number;
+  status: number;
+  createdAt: bigint;
+};
+
+const ASSET_LABEL = ["AZR", "USDT"];
+const STATUS_LABEL = ["Pending", "Approved", "Rejected"];
+const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
 
 export default function WithdrawalsPage() {
   const t = useTranslations("withdrawalsPage");
@@ -27,7 +39,24 @@ export default function WithdrawalsPage() {
   const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
   const { data: azrBal, isLoading: balLoading } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: usdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
-  const { data: reqCount, isLoading: reqLoading } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+  const { data: reqCount, isLoading: reqLoading, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+
+  // Batch-fetch all withdrawal requests by ID
+  const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
+  const { data: allRequestsRaw, refetch: refetchRequests } = useReadContracts({
+    contracts: Array.from({ length: reqCountNum }, (_, i) => ({
+      address: CONTRACTS[chainId].staking as `0x${string}`,
+      abi: STAKING_ABI,
+      functionName: "getWithdrawalRequest" as const,
+      args: [BigInt(i + 1)] as [bigint],
+    })),
+    query: { enabled: reqCountNum > 0 },
+  });
+
+  // Filter to only show the connected user's requests
+  const myRequests: WRequest[] = (allRequestsRaw ?? [])
+    .map((r) => r.result as WRequest | undefined)
+    .filter((r): r is WRequest => !!r && r.requester?.toLowerCase() === addr?.toLowerCase());
 
   const fee = feeBps ? Number(feeBps as bigint) / 10000 : 0.02;
   const feeAmt = amount ? parseFloat(amount) * fee : 0;
@@ -45,6 +74,7 @@ export default function WithdrawalsPage() {
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "requestWithdrawal", args: [parsed, asset] });
       toast(`Withdrawal of ${amount} ${assetLabel} requested`);
       setAmount("");
+      setTimeout(() => { refetchReqCount(); refetchRequests(); }, 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
     }
@@ -120,16 +150,14 @@ export default function WithdrawalsPage() {
                   {[0, 1, 2].map((i) => (
                     <tr key={i}>
                       {[0, 1, 2, 3, 4].map((j) => (
-                        <td key={j} className="py-3 pr-4">
-                          <Skeleton className="h-3 w-full" />
-                        </td>
+                        <td key={j} className="py-3 pr-4"><Skeleton className="h-3 w-full" /></td>
                       ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : !reqCount || Number(reqCount as bigint) === 0 ? (
+          ) : myRequests.length === 0 ? (
             <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>{t("noRequests")}</div>
           ) : (
             <div className="overflow-x-auto">
@@ -143,10 +171,24 @@ export default function WithdrawalsPage() {
                     <th className="text-left pb-3 font-normal">Date</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td className="py-3 az-mono" colSpan={5} style={{ color: "var(--muted)" }}>No requests found.</td>
-                  </tr>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {myRequests.map((req) => (
+                    <tr key={req.id.toString()}>
+                      <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
+                      <td className="py-3 text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</td>
+                      <td className="py-3 font-semibold az-mono">
+                        {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
+                      </td>
+                      <td className="py-3">
+                        <span className="az-mono text-xs font-semibold" style={{ color: STATUS_COLOR[req.status] ?? "var(--text-2)" }}>
+                          {STATUS_LABEL[req.status] ?? "Unknown"}
+                        </span>
+                      </td>
+                      <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
+                        {new Date(Number(req.createdAt) * 1000).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

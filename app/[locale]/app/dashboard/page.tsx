@@ -86,7 +86,7 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? "1 active position" : "No active stake"} glow />
+              <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? `${activePositions.length} active position${activePositions.length !== 1 ? "s" : ""}` : "No active stake"} glow />
               <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
               <KpiCard label={t("portfolio")} value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" />
               <KpiCard label={t("referralEarnings")} value="—" unit="AZR" />

@@ -3,7 +3,7 @@
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
-import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT } from "@/lib/contracts";
+import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
 import { useState, useEffect, useCallback } from "react";
@@ -25,7 +25,6 @@ export default function StakePage() {
   const { chainId } = useActiveChain();
 
   const [amount, setAmount] = useState("");
-  const [referral, setReferral] = useState("");
   const [claimHistory, setClaimHistory] = useState<{ date: string; amount: string }[]>([]);
 
   const { writeContractAsync, data: txHash } = useWriteContract();
@@ -43,6 +42,25 @@ export default function StakePage() {
     query: { enabled: !!addr },
   });
 
+  // Auto-fetch the referrer registered at sign-up — no manual input needed
+  const { data: selfUserInfo } = useReadContract({
+    address: CONTRACTS[chainId].staking,
+    abi: STAKING_ABI,
+    functionName: "usersByAddress",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr },
+  });
+  const selfUsername = (selfUserInfo?.[1] as string) ?? "";
+
+  const { data: referredByData } = useReadContract({
+    address: CONTRACTS[chainId].staking,
+    abi: STAKING_ABI,
+    functionName: "referredBy",
+    args: selfUsername ? [selfUsername] : undefined,
+    query: { enabled: !!selfUsername },
+  });
+  const autoReferrer = (referredByData as string) ?? "";
+
   const azrBalance = azrBal ? parseFloat(formatUnits(azrBal as bigint, 18)) : 0;
   const minStakeAmt = minStake ? parseFloat(formatUnits(minStake as bigint, 18)) : 50;
   const lockDays = lockPeriod ? Math.floor(Number(lockPeriod as bigint) / 86400) : 150;
@@ -51,7 +69,7 @@ export default function StakePage() {
   const activePositions = positions.filter((p) => p.active);
   const estDaily = amount ? (parseFloat(amount) * 0.007).toFixed(2) : "0.00";
 
-  // Fetch claim history from events
+  // Fetch claim history from events — use deploy block to avoid RPC range-limit errors
   const fetchClaimHistory = useCallback(async () => {
     if (!addr || !publicClient) return;
     try {
@@ -59,7 +77,7 @@ export default function StakePage() {
         address: CONTRACTS[chainId].staking,
         event: REWARDS_CLAIMED_EVENT,
         args: { user: addr },
-        fromBlock: BigInt(0),
+        fromBlock: STAKING_DEPLOY_BLOCK,
         toBlock: "latest",
       });
       const history = await Promise.all(
@@ -84,7 +102,7 @@ export default function StakePage() {
     const parsed = parseUnits(amount, 18);
     try {
       await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, referral.replace(/\.azr$/, "")] });
+      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
       toast(`Staked ${amount} AZR · locked ${lockDays} days`);
       setAmount("");
       setTimeout(() => refetchPositions(), 3000);
@@ -96,9 +114,11 @@ export default function StakePage() {
   const doClaim = async (stakeId: bigint) => {
     if (!addr) return;
     try {
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimRewards", args: [stakeId] });
+      const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimRewards", args: [stakeId] });
       toast("Rewards claimed to balance");
-      setTimeout(() => { refetchPositions(); fetchClaimHistory(); }, 4000);
+      await publicClient!.waitForTransactionReceipt({ hash });
+      refetchPositions();
+      fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     }
@@ -107,9 +127,11 @@ export default function StakePage() {
   const doClaimAll = async () => {
     if (!addr) return;
     try {
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimAllRewards", args: [] });
+      const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimAllRewards", args: [] });
       toast("All rewards claimed");
-      setTimeout(() => { refetchPositions(); fetchClaimHistory(); }, 4000);
+      await publicClient!.waitForTransactionReceipt({ hash });
+      refetchPositions();
+      fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     }
@@ -139,7 +161,7 @@ export default function StakePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="az-card">
             <h3 className="font-semibold mb-5">New Stake</h3>
-            <div className="mb-4">
+            <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs az-mono" style={{ color: "var(--muted)" }}>Amount (AZR)</label>
                 <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>Balance: {azrBalance.toFixed(2)}</span>
@@ -148,10 +170,6 @@ export default function StakePage() {
                 <input className="az-input flex-1" type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
                 <button className="px-3 rounded-ctl text-xs font-semibold" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }} onClick={() => setAmount(azrBalance.toFixed(2))}>MAX</button>
               </div>
-            </div>
-            <div className="mb-4">
-              <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>Referral (optional)</label>
-              <input className="az-input" placeholder="friend.azr" value={referral} onChange={(e) => setReferral(e.target.value)} />
             </div>
             <div className="grid grid-cols-3 gap-3 mb-5 p-3 rounded-ctl" style={{ background: "var(--bg-2)" }}>
               {[

@@ -1,7 +1,7 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits, isAddress } from "viem";
@@ -34,7 +34,23 @@ export default function AdminPage() {
   const { data: l2Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL2", query: { enabled: true } });
   const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
   const { data: isPaused, refetch: refetchPaused } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "paused", query: { enabled: true } });
-  const { data: reqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+  const { data: reqCount, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+
+  // Batch-fetch all withdrawal requests
+  const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
+  type WRequest = { id: bigint; requester: `0x${string}`; amount: bigint; assetType: number; status: number; createdAt: bigint };
+  const { data: allRequestsRaw, refetch: refetchAllRequests } = useReadContracts({
+    contracts: Array.from({ length: reqCountNum }, (_, i) => ({
+      address: CONTRACTS[chainId].staking as `0x${string}`,
+      abi: STAKING_ABI,
+      functionName: "getWithdrawalRequest" as const,
+      args: [BigInt(i + 1)] as [bigint],
+    })),
+    query: { enabled: reqCountNum > 0 },
+  });
+  const allRequests: WRequest[] = (allRequestsRaw ?? [])
+    .map((r) => r.result as WRequest | undefined)
+    .filter((r): r is WRequest => !!r);
 
   // Form state
   const [lockDays, setLockDays] = useState("");
@@ -46,6 +62,16 @@ export default function AdminPage() {
   const [debitAmt, setDebitAmt] = useState("");
   const [debitAddr, setDebitAddr] = useState<string>("");
   const [withdrawId, setWithdrawId] = useState("");
+
+  // Live staked balance for the debit target — prevents "unlimited gas" from over-debit
+  const { data: targetStaked } = useReadContract({
+    address: CONTRACTS[chainId].staking,
+    abi: STAKING_ABI,
+    functionName: "getTotalStaked",
+    args: isAddress(debitAddr) ? [debitAddr as `0x${string}`] : undefined,
+    query: { enabled: isAddress(debitAddr) },
+  });
+  const targetStakedAmt = targetStaked ? parseFloat(formatUnits(targetStaked as bigint, 18)) : 0;
 
   const isOwner = !!addr && !!owner && addr.toLowerCase() === (owner as string).toLowerCase();
 
@@ -209,14 +235,24 @@ export default function AdminPage() {
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Wallet Address</label>
                 <input className="az-input" placeholder="0x..." value={debitAddr} onChange={(e) => setDebitAddr(e.target.value)} />
+                {isAddress(debitAddr) && (
+                  <p className="text-[11px] az-mono mt-1" style={{ color: "var(--muted)" }}>
+                    Staked balance: <span style={{ color: "var(--teal)" }}>{targetStakedAmt.toFixed(4)} AZR</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (AZR)</label>
                 <input className="az-input" placeholder="0.00" value={debitAmt} onChange={(e) => setDebitAmt(e.target.value)} type="number" />
+                {isAddress(debitAddr) && debitAmt && parseFloat(debitAmt) > targetStakedAmt && (
+                  <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>
+                    Exceeds staked balance ({targetStakedAmt.toFixed(4)} AZR)
+                  </p>
+                )}
               </div>
               <button
                 className="az-btn-primary w-full"
-                disabled={confirming || !debitAmt || !isAddress(debitAddr)}
+                disabled={confirming || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") > targetStakedAmt || targetStakedAmt === 0}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "debitAccount", args: [debitAddr as `0x${string}`, parseUnits(debitAmt, 18)] }),
                   `Debited ${debitAmt} AZR from ${debitAddr.slice(0, 8)}…`,
@@ -240,6 +276,7 @@ export default function AdminPage() {
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "approveWithdrawal", args: [BigInt(withdrawId)] }),
                   `Withdrawal #${withdrawId} approved`,
+                  () => { refetchAllRequests(); refetchReqCount(); },
                 )}
               >✓ Approve</button>
               <button
@@ -248,12 +285,88 @@ export default function AdminPage() {
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "rejectWithdrawal", args: [BigInt(withdrawId)] }),
                   `Withdrawal #${withdrawId} rejected`,
+                  () => { refetchAllRequests(); refetchReqCount(); },
                 )}
               >✗ Reject</button>
             </div>
           </AdminCard>
 
         </div>
+
+        {/* All withdrawal requests list */}
+        <AdminCard title="All Withdrawal Requests">
+          {allRequests.length === 0 ? (
+            <p className="text-sm py-4 text-center" style={{ color: "var(--text-2)" }}>No withdrawal requests yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                    <th className="text-left pb-3 font-normal">#</th>
+                    <th className="text-left pb-3 font-normal">Requester</th>
+                    <th className="text-left pb-3 font-normal">Asset</th>
+                    <th className="text-left pb-3 font-normal">Amount</th>
+                    <th className="text-left pb-3 font-normal">Status</th>
+                    <th className="text-left pb-3 font-normal">Date</th>
+                    <th className="text-right pb-3 font-normal">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {allRequests.map((req) => {
+                    const ASSET_LABEL = ["AZR", "USDT"];
+                    const STATUS_LABEL = ["Pending", "Approved", "Rejected"];
+                    const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
+                    const isPending = req.status === 0;
+                    return (
+                      <tr key={req.id.toString()}>
+                        <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
+                        <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
+                          {req.requester.slice(0, 6)}…{req.requester.slice(-4)}
+                        </td>
+                        <td className="py-3 text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</td>
+                        <td className="py-3 font-semibold az-mono">
+                          {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
+                        </td>
+                        <td className="py-3">
+                          <span className="az-mono text-xs font-semibold" style={{ color: STATUS_COLOR[req.status] ?? "var(--text-2)" }}>
+                            {STATUS_LABEL[req.status] ?? "Unknown"}
+                          </span>
+                        </td>
+                        <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
+                          {new Date(Number(req.createdAt) * 1000).toLocaleDateString()}
+                        </td>
+                        <td className="py-3">
+                          {isPending && (
+                            <div className="flex gap-1.5 justify-end">
+                              <button
+                                className="az-btn-primary text-xs px-2.5 py-1"
+                                disabled={confirming}
+                                onClick={() => exec(
+                                  () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "approveWithdrawal", args: [req.id] }),
+                                  `Withdrawal #${Number(req.id)} approved`,
+                                  () => { refetchAllRequests(); refetchReqCount(); },
+                                )}
+                              >✓</button>
+                              <button
+                                className="az-btn-ghost text-xs px-2.5 py-1"
+                                disabled={confirming}
+                                onClick={() => exec(
+                                  () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "rejectWithdrawal", args: [req.id] }),
+                                  `Withdrawal #${Number(req.id)} rejected`,
+                                  () => { refetchAllRequests(); refetchReqCount(); },
+                                )}
+                              >✗</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AdminCard>
 
         {/* Pause / unpause */}
         <AdminCard title="Contract Circuit Breaker">
