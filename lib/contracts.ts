@@ -68,7 +68,7 @@ export const STAKING_ABI = [
 
   // ── Withdrawal ────────────────────────────────────────────────────────────
   { name: "requestWithdrawal", type: "function", stateMutability: "nonpayable", inputs: [{ name: "amount", type: "uint256" }, { name: "assetType", type: "uint8" }], outputs: [] },
-  { name: "getWithdrawalRequest", type: "function", stateMutability: "view", inputs: [{ name: "id", type: "uint256" }], outputs: [{ name: "id", type: "uint256" }, { name: "requester", type: "address" }, { name: "amount", type: "uint256" }, { name: "assetType", type: "uint8" }, { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" }] },
+  { name: "withdrawalRequests", type: "function", stateMutability: "view", inputs: [{ name: "requestId", type: "uint256" }], outputs: [{ name: "id", type: "uint256" }, { name: "requester", type: "address" }, { name: "amount", type: "uint256" }, { name: "assetType", type: "uint8" }, { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" }] },
   { name: "withdrawalRequestCount", type: "function", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
 
   // ── Protocol params ───────────────────────────────────────────────────────

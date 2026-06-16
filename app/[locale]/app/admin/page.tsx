@@ -45,7 +45,7 @@ export default function AdminPage() {
     contracts: Array.from({ length: reqCountNum }, (_, i) => ({
       address: CONTRACTS[chainId].staking as `0x${string}`,
       abi: STAKING_ABI,
-      functionName: "getWithdrawalRequest" as const,
+      functionName: "withdrawalRequests" as const,
       args: [BigInt(i + 1)] as [bigint],
     })),
     query: { enabled: reqCountNum > 0 },
