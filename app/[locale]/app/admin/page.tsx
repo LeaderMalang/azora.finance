@@ -262,7 +262,11 @@ export default function AdminPage() {
               />
               <button
                 className="az-btn-primary px-4"
-                disabled={confirming || !usdtDepositAmt}
+                disabled={
+                  confirming ||
+                  !usdtDepositAmt ||
+                  parseFloat(usdtDepositAmt || "0") > (adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)) : 0)
+                }
                 onClick={() => exec(
                   () => writeContractAsync({
                     address: CONTRACTS[chainId].usdt,
@@ -275,6 +279,11 @@ export default function AdminPage() {
                 )}
               >Deposit</button>
             </div>
+            {adminUsdtBal !== undefined && usdtDepositAmt && parseFloat(usdtDepositAmt) > parseFloat(formatUnits(adminUsdtBal as bigint, 18)) && (
+              <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>
+                Exceeds your wallet balance ({parseFloat(formatUnits(adminUsdtBal as bigint, 18)).toFixed(2)} USDT)
+              </p>
+            )}
           </AdminCard>
 
           {/* Debit account */}

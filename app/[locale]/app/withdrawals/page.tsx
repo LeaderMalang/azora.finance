@@ -3,7 +3,7 @@
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
@@ -35,6 +35,7 @@ export default function WithdrawalsPage() {
 
   const { writeContractAsync, data: txHash } = useWriteContract();
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
   const { data: azrBal, isLoading: balLoading } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
@@ -70,7 +71,8 @@ export default function WithdrawalsPage() {
     const parsed = parseUnits(amount, 18);
     const tokenAddr = asset === 0 ? CONTRACTS[chainId].azoraToken : CONTRACTS[chainId].usdt;
     try {
-      await writeContractAsync({ address: tokenAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      const approveHash = await writeContractAsync({ address: tokenAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      await publicClient!.waitForTransactionReceipt({ hash: approveHash });
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "requestWithdrawal", args: [parsed, asset] });
       toast(`Withdrawal of ${amount} ${assetLabel} requested`);
       setAmount("");

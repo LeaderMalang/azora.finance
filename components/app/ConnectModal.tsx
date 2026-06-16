@@ -35,6 +35,7 @@ export function ConnectModal() {
   const [registering, setRegistering] = useState(false);
   const [isPendingReg, setIsPendingReg] = useState(false);
   const [regTxHash, setRegTxHash] = useState<`0x${string}` | undefined>();
+  const [confirmedRegistered, setConfirmedRegistered] = useState(false);
 
   // Always query the correct chain regardless of connected wallet's chain
   const {
@@ -78,14 +79,17 @@ export function ConnectModal() {
   useEffect(() => {
     if (!isConnected) {
       setStep(0);
-    } else if (userInfoFetched && !userInfoError && !isRegistered) {
+    } else if (userInfoFetched && !userInfoError && !isRegistered && !confirmedRegistered) {
       setStep(1);
     }
-  }, [isConnected, isRegistered, userInfoFetched, userInfoError]);
+  }, [isConnected, isRegistered, userInfoFetched, userInfoError, confirmedRegistered]);
 
-  // Stop polling once registration is confirmed
+  // Stop polling and latch confirmed state once registration is detected on-chain
   useEffect(() => {
-    if (isRegistered) setIsPendingReg(false);
+    if (isRegistered) {
+      setConfirmedRegistered(true);
+      setIsPendingReg(false);
+    }
   }, [isRegistered]);
 
   const register = async () => {
@@ -109,7 +113,7 @@ export function ConnectModal() {
     }
   };
 
-  if (isRegistered) return null;
+  if (isRegistered || confirmedRegistered) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(6,10,18,0.92)", backdropFilter: "blur(16px)" }}>

@@ -99,9 +99,14 @@ export default function StakePage() {
 
   const doStake = async () => {
     if (!addr || !amount) return;
+    if (parseFloat(amount) > azrBalance) {
+      toast("Insufficient AZR balance", "error");
+      return;
+    }
     const parsed = parseUnits(amount, 18);
     try {
-      await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      const approveHash = await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      await publicClient!.waitForTransactionReceipt({ hash: approveHash });
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
       toast(`Staked ${amount} AZR · locked ${lockDays} days`);
       setAmount("");
@@ -187,7 +192,7 @@ export default function StakePage() {
               <span style={{ color: "var(--text-2)" }}>{t("estDaily")}</span>
               <span className="font-bold az-mono text-teal">+{estDaily} AZR</span>
             </div>
-            <button className="az-btn-primary w-full" onClick={doStake} disabled={confirming || !amount}>
+            <button className="az-btn-primary w-full" onClick={doStake} disabled={confirming || !amount || parseFloat(amount || "0") > azrBalance}>
               {confirming ? t("staking") : t("stakeBtn")}
             </button>
           </div>
