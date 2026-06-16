@@ -31,7 +31,7 @@ export default function StakePage() {
   const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
-  const { data: azrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: azrBal, refetch: refetchBalance } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: minStake } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "minStakeAmount", query: { enabled: true } });
   const { data: lockPeriod } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "lockPeriod", query: { enabled: true } });
   const { data: rawPositions, refetch: refetchPositions } = useReadContract({
@@ -110,6 +110,7 @@ export default function StakePage() {
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
       toast(`Staked ${amount} AZR · locked ${lockDays} days`);
       setAmount("");
+      refetchBalance();
       setTimeout(() => refetchPositions(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
@@ -123,6 +124,7 @@ export default function StakePage() {
       toast("Rewards claimed to balance");
       await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
+      refetchBalance();
       fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
@@ -136,6 +138,7 @@ export default function StakePage() {
       toast("All rewards claimed");
       await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
+      refetchBalance();
       fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
@@ -151,6 +154,7 @@ export default function StakePage() {
     try {
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
       toast("Unstaked · principal + rewards returned");
+      refetchBalance();
       setTimeout(() => refetchPositions(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Unstake failed", "error");

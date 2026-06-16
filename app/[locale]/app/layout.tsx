@@ -8,7 +8,6 @@ import { SupportButton } from "@/components/ui/SupportButton";
 import { SidebarContext } from "@/components/app/SidebarContext";
 import { useAccount, useReadContract } from "wagmi";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
 
@@ -35,7 +34,6 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const [mounted, setMounted] = useState(false);
   const [wasConnected, setWasConnected] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const router = useRouter();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -43,7 +41,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
     if (isConnected) {
       setWasConnected(true);
     } else if (wasConnected && mounted) {
-      router.push(`/${locale}`);
+      window.location.href = `/${locale}`;
     }
   }, [isConnected, mounted]);
 

@@ -30,7 +30,10 @@ export function ConnectModal() {
 
   const [step, setStep] = useState(0);
   const [username, setUsername] = useState("");
-  const [referral, setReferral] = useState("");
+  const [referral, setReferral] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return sessionStorage.getItem('pendingReferral') ?? '';
+  });
   const [err, setErr] = useState("");
   const [registering, setRegistering] = useState(false);
   const [isPendingReg, setIsPendingReg] = useState(false);
@@ -107,6 +110,7 @@ export function ConnectModal() {
       });
       setRegTxHash(hash);
       setIsPendingReg(true);
+      sessionStorage.removeItem('pendingReferral');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message.slice(0, 120) : "Transaction failed");
       setRegistering(false);

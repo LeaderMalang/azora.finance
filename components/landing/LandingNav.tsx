@@ -30,6 +30,8 @@ export function LandingNav({ locale }: { locale: string }) {
 
   useEffect(() => {
     setMounted(true);
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) sessionStorage.setItem('pendingReferral', ref);
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

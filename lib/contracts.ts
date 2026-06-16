@@ -106,6 +106,17 @@ export const ERC20_ABI = [
 // Earliest block to scan for events — prevents RPC range-limit errors on BSC
 export const STAKING_DEPLOY_BLOCK = BigInt(47_000_000);
 
+export const REFERRAL_COMMISSION_EVENT = {
+  name: "ReferralCommission",
+  type: "event",
+  inputs: [
+    { name: "recipient", type: "address", indexed: true },
+    { name: "from",      type: "address", indexed: true },
+    { name: "level",     type: "uint8",   indexed: false },
+    { name: "amount",    type: "uint256", indexed: false },
+  ],
+} as const;
+
 export const REWARDS_CLAIMED_EVENT = {
   name: "RewardsClaimed",
   type: "event",
