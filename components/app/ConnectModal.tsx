@@ -88,8 +88,20 @@ export function ConnectModal() {
   }, [isConnected, isRegistered, userInfoFetched, userInfoError, confirmedRegistered]);
 
   // Stop polling and latch confirmed state once registration is detected on-chain
+  // Also sync user to DB so referral network and commission history work
   useEffect(() => {
     if (isRegistered) {
+      if (addr) {
+        const u = (userInfo?.[1] as string) ?? username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
+        const ref = referral.trim().replace(/\.azr$/, "");
+        if (u) {
+          fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: u, walletAddress: addr, referralUsername: ref }),
+          }).catch(() => {});
+        }
+      }
       setConfirmedRegistered(true);
       setIsPendingReg(false);
     }

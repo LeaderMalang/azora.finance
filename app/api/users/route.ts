@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.upsert({
       where: { walletAddress },
-      update: {},
+      update: referredById ? { referredById } : {},
       create: { username: clean, walletAddress, referredById },
     });
 

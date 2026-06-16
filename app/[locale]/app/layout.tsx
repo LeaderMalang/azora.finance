@@ -74,6 +74,26 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const username = (userInfo?.[1] as string) ?? "";
   const isOwner = !!addr && !!ownerAddr && addr.toLowerCase() === (ownerAddr as string).toLowerCase();
 
+  const { data: referredByData } = useReadContract({
+    address: CONTRACTS[targetChain.id as 56 | 97].staking,
+    abi: STAKING_ABI,
+    functionName: "referredBy",
+    args: username ? [username] : undefined,
+    chainId: targetChain.id,
+    query: { enabled: !!username && isRegistered },
+  });
+
+  // Sync every registered wallet to DB on app load so referral network is populated
+  useEffect(() => {
+    if (!isRegistered || !addr || !username) return;
+    const referrer = (referredByData as string) ?? "";
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, walletAddress: addr, referralUsername: referrer }),
+    }).catch(() => {});
+  }, [isRegistered, addr, username, referredByData]);
+
   const showModal = mounted && isConnected && !isRegistered;
 
   return (
