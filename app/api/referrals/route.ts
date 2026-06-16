@@ -11,7 +11,6 @@ export async function GET(req: NextRequest) {
   const earnings = await prisma.referralEarning.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    take: 50,
   });
 
   const totals = earnings.reduce<{ l1: number; l2: number; l3: number }>(
@@ -30,6 +29,11 @@ export async function POST(req: NextRequest) {
   const { wallet, fromUser, level, amount, txHash } = await req.json();
   const user = await prisma.user.findFirst({ where: { walletAddress: wallet } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  if (txHash) {
+    const existing = await prisma.referralEarning.findFirst({ where: { userId: user.id, txHash } });
+    if (existing) return NextResponse.json(existing, { status: 200 });
+  }
 
   const earning = await prisma.referralEarning.create({
     data: { userId: user.id, fromUser, level, amount: String(amount), txHash },
