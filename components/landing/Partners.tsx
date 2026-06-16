@@ -20,11 +20,16 @@ const PARTNERS = [
     name: "MetaMask",
     logo: (
       <svg viewBox="0 0 48 48" className="w-8 h-8" fill="none">
-        <path d="M42 6L26 18l3-7L42 6z" fill="#E17726" />
-        <path d="M6 6l16 12-3-7L6 6z" fill="#E27625" />
-        <path d="M36 33.6l-4.2 6.5 9 2.5 2.6-8.7-7.4-.3z" fill="#E27625" />
-        <path d="M4.6 33.9l2.6 8.7 9-2.5-4.2-6.5-7.4.3z" fill="#E27625" />
-        <circle cx="24" cy="24" r="8" fill="#E27625" opacity="0.25" />
+        <path d="M42.7 5L27.2 16.6l2.8-6.7L42.7 5z" fill="#E17726" stroke="#E17726" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M5.3 5l15.3 11.7-2.7-6.8L5.3 5z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M37 33.2l-4.1 6.3 8.8 2.4 2.5-8.4L37 33.2z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M4.8 33.5l2.5 8.4 8.8-2.4-4.1-6.3-7.2.3z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M15.7 21.8l-2.3 3.5 8.2.4-.3-8.8-5.6 4.9z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M32.3 21.8l-5.7-5-.3 8.9 8.2-.4-2.2-3.5z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M16.1 39.5l4.9-2.4-4.2-3.3-.7 5.7z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M27 37.1l4.9 2.4-.7-5.7-4.2 3.3z" fill="#E27625" stroke="#E27625" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M32 39.5l-4.9-2.4.4 3.3-.1 1.8L32 39.5z" fill="#D6C0B3" stroke="#D6C0B3" strokeWidth="0.3" strokeLinejoin="round"/>
+        <path d="M16 39.5l4.6 2.7-.1-1.8.4-3.3L16 39.5z" fill="#D6C0B3" stroke="#D6C0B3" strokeWidth="0.3" strokeLinejoin="round"/>
       </svg>
     ),
   },
@@ -51,7 +56,16 @@ const PARTNERS = [
     logo: (
       <svg viewBox="0 0 48 48" className="w-8 h-8" fill="none">
         <circle cx="24" cy="24" r="24" fill="#1FC7D4" />
-        <path d="M24 12c-3.3 0-6 1.3-6 3s2.7 3 6 3 6-1.3 6-3-2.7-3-6-3zm0 18c-5 0-9-2-9-4.5S19 21 24 21s9 2 9 4.5S29 30 24 30z" fill="white" opacity="0.9" />
+        {/* Bunny ears */}
+        <ellipse cx="18" cy="12" rx="4" ry="6.5" fill="white" opacity="0.9"/>
+        <ellipse cx="30" cy="12" rx="4" ry="6.5" fill="white" opacity="0.9"/>
+        <ellipse cx="18" cy="12" rx="2.2" ry="4.5" fill="#FF6B81"/>
+        <ellipse cx="30" cy="12" rx="2.2" ry="4.5" fill="#FF6B81"/>
+        {/* Face */}
+        <circle cx="24" cy="28" r="11" fill="white" opacity="0.9"/>
+        <circle cx="20" cy="26" r="1.5" fill="#1FC7D4"/>
+        <circle cx="28" cy="26" r="1.5" fill="#1FC7D4"/>
+        <path d="M21 31 Q24 33.5 27 31" stroke="#1FC7D4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
       </svg>
     ),
   },

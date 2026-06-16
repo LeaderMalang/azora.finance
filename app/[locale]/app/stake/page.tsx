@@ -2,12 +2,13 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
 
 type StakePosition = {
   id: bigint;
@@ -26,9 +27,9 @@ export default function StakePage() {
 
   const [amount, setAmount] = useState("");
   const [claimHistory, setClaimHistory] = useState<{ date: string; amount: string }[]>([]);
+  const [txPending, setTxPending] = useState(false);
 
-  const { writeContractAsync, data: txHash } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: azrBal, refetch: refetchBalance } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
@@ -103,6 +104,7 @@ export default function StakePage() {
       toast("Insufficient AZR balance", "error");
       return;
     }
+    setTxPending(true);
     const parsed = parseUnits(amount, 18);
     try {
       const approveHash = await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
@@ -114,11 +116,14 @@ export default function StakePage() {
       setTimeout(() => refetchPositions(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
 
   const doClaim = async (stakeId: bigint) => {
     if (!addr) return;
+    setTxPending(true);
     try {
       const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimRewards", args: [stakeId] });
       toast("Rewards claimed to balance");
@@ -128,11 +133,14 @@ export default function StakePage() {
       fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
 
   const doClaimAll = async () => {
     if (!addr) return;
+    setTxPending(true);
     try {
       const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimAllRewards", args: [] });
       toast("All rewards claimed");
@@ -142,6 +150,8 @@ export default function StakePage() {
       fetchClaimHistory();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
 
@@ -151,6 +161,7 @@ export default function StakePage() {
       toast("Lock period has not expired yet", "error");
       return;
     }
+    setTxPending(true);
     try {
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
       toast("Unstaked · principal + rewards returned");
@@ -158,6 +169,8 @@ export default function StakePage() {
       setTimeout(() => refetchPositions(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Unstake failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
 
@@ -196,8 +209,13 @@ export default function StakePage() {
               <span style={{ color: "var(--text-2)" }}>{t("estDaily")}</span>
               <span className="font-bold az-mono text-teal">+{estDaily} AZR</span>
             </div>
-            <button className="az-btn-primary w-full" onClick={doStake} disabled={confirming || !amount || parseFloat(amount || "0") > azrBalance}>
-              {confirming ? t("staking") : t("stakeBtn")}
+            {txPending && (
+              <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-ctl mb-3" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
+                <Spinner size="sm" /> Waiting for blockchain confirmation…
+              </div>
+            )}
+            <button className="az-btn-primary w-full" onClick={doStake} disabled={txPending || !amount || parseFloat(amount || "0") > azrBalance}>
+              {txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : t("stakeBtn")}
             </button>
           </div>
 
@@ -224,8 +242,8 @@ export default function StakePage() {
                   </div>
                 </div>
                 {activePositions.length > 1 && (
-                  <button className="az-btn-primary w-full mb-4 text-sm" onClick={doClaimAll} disabled={confirming}>
-                    Claim All Rewards
+                  <button className="az-btn-primary w-full mb-4 text-sm" onClick={doClaimAll} disabled={txPending}>
+                    {txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Claim All Rewards"}
                   </button>
                 )}
               </>
@@ -275,14 +293,14 @@ export default function StakePage() {
                             <button
                               className="az-btn-primary text-xs px-3 py-1.5"
                               onClick={() => doClaim(pos.id)}
-                              disabled={confirming}
+                              disabled={txPending}
                             >
-                              Claim
+                              {txPending ? <Spinner size="sm" /> : "Claim"}
                             </button>
                             <button
                               className="az-btn-ghost text-xs px-3 py-1.5"
                               onClick={() => doUnstake(pos.id, pos.unlockTime)}
-                              disabled={confirming || !unlocked}
+                              disabled={txPending || !unlocked}
                             >
                               Unstake
                             </button>

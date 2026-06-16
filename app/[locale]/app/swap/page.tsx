@@ -2,12 +2,14 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 
 export default function SwapPage() {
   const t = useTranslations("swap");
@@ -15,10 +17,11 @@ export default function SwapPage() {
   const { toast } = useToast();
   const { chainId } = useActiveChain();
 
-  const [dir, setDir] = useState<"buy" | "sell">("buy"); // buy = USDT→AZR
+  const [dir, setDir] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
-  const { writeContractAsync, data: txHash } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const [txPending, setTxPending] = useState(false);
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: usdtBal, refetch: refetchUsdt } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: azrBal, refetch: refetchAzr } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
@@ -29,12 +32,12 @@ export default function SwapPage() {
 
   const doSwap = async () => {
     if (!addr || !amount || parseFloat(amount) <= 0) return;
+    setTxPending(true);
     const parsed = parseUnits(amount, 18);
     try {
-      // First approve
       const approveAddr = dir === "buy" ? CONTRACTS[chainId].usdt : CONTRACTS[chainId].azoraToken;
-      await writeContractAsync({ address: approveAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
-      // Then swap
+      const approveHash = await writeContractAsync({ address: approveAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
+      await publicClient!.waitForTransactionReceipt({ hash: approveHash });
       const fn = dir === "buy" ? "swapUSDTForToken" : "swapTokenForUSDT";
       await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: fn, args: [parsed] });
       toast(`Swapped ${amount} ${fromLabel} → ${toLabel}`);
@@ -43,21 +46,9 @@ export default function SwapPage() {
       refetchAzr();
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
+    } finally {
+      setTxPending(false);
     }
-  };
-
-  const TokenIcon = ({ symbol }: { symbol: string }) => {
-    if (symbol === "USDT") return (
-      <span className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs" style={{ background: "#26A17B", color: "white" }}>₮</span>
-    );
-    return (
-      <span className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, var(--teal), var(--teal-deep))" }}>
-        <svg className="w-4 h-4" viewBox="0 0 32 32" fill="none">
-          <path d="M16 4 L27 22 H5 Z" stroke="white" strokeWidth="2" strokeLinejoin="round" />
-          <path d="M16 11 L21 20 H11 Z" fill="white" />
-        </svg>
-      </span>
-    );
   };
 
   return (
@@ -82,7 +73,7 @@ export default function SwapPage() {
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl" style={{ background: "#26A17B", color: "white" }}>₮</span>
+                  <TokenIcon symbol="USDT" size="lg" />
                   <span className="text-xs az-mono font-semibold">USDT</span>
                   <span className="text-[11px]" style={{ color: "var(--muted)" }}>Tether</span>
                 </div>
@@ -91,9 +82,7 @@ export default function SwapPage() {
                   <span className="text-[11px] az-mono font-semibold" style={{ color: "var(--teal)" }}>1:1</span>
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, var(--teal), var(--teal-deep))" }}>
-                    <svg className="w-6 h-6" viewBox="0 0 32 32" fill="none"><path d="M16 4 L27 22 H5 Z" stroke="white" strokeWidth="2" strokeLinejoin="round" /><path d="M16 11 L21 20 H11 Z" fill="white" /></svg>
-                  </span>
+                  <TokenIcon symbol="AZR" size="lg" />
                   <span className="text-xs az-mono font-semibold">AZR</span>
                   <span className="text-[11px]" style={{ color: "var(--muted)" }}>Azora</span>
                 </div>
@@ -131,7 +120,7 @@ export default function SwapPage() {
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <TokenIcon symbol={fromLabel} />
+                  <TokenIcon symbol={fromLabel as "USDT" | "AZR"} size="sm" />
                   <span className="text-xs az-mono font-semibold">{fromLabel}</span>
                 </div>
                 <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>
@@ -145,11 +134,13 @@ export default function SwapPage() {
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  disabled={txPending}
                 />
                 <button
                   className="px-3 py-2 rounded-ctl text-xs font-semibold az-mono"
                   style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
                   onClick={() => setAmount(fromBal.toFixed(2))}
+                  disabled={txPending}
                 >
                   {t("max")}
                 </button>
@@ -161,6 +152,7 @@ export default function SwapPage() {
                 onClick={() => setDir(dir === "buy" ? "sell" : "buy")}
                 className="w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-200 hover:rotate-180 hover:border-teal"
                 style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}
+                disabled={txPending}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4" /></svg>
               </button>
@@ -168,7 +160,7 @@ export default function SwapPage() {
 
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <TokenIcon symbol={toLabel} />
+                <TokenIcon symbol={toLabel as "USDT" | "AZR"} size="sm" />
                 <span className="text-xs az-mono font-semibold">{toLabel}</span>
               </div>
               <div
@@ -181,8 +173,16 @@ export default function SwapPage() {
 
             <p className="text-xs mb-5 text-center" style={{ color: "var(--muted)" }}>{t("rateNote")}</p>
 
-            <button className="az-btn-primary w-full" onClick={doSwap} disabled={confirming || !amount}>
-              {confirming ? t("swapping") : t("swapBtn")}
+            {txPending && (
+              <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-ctl mb-3" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
+                <Spinner size="sm" /> Waiting for blockchain confirmation…
+              </div>
+            )}
+
+            <button className="az-btn-primary w-full" onClick={doSwap} disabled={txPending || !amount}>
+              {txPending ? (
+                <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span>
+              ) : t("swapBtn")}
             </button>
           </div>
         </div>

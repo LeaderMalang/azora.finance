@@ -2,8 +2,10 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Spinner } from "@/components/ui/Spinner";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, usePublicClient } from "wagmi";
 import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits } from "viem";
@@ -29,12 +31,14 @@ export default function WithdrawalsPage() {
   const { toast } = useToast();
   const { chainId } = useActiveChain();
 
-  const [asset, setAsset] = useState<0 | 1>(0); // 0=AZR 1=USDT
+  const [asset, setAsset] = useState<0 | 1>(0);
   const [amount, setAmount] = useState("");
   const [inputErr, setInputErr] = useState("");
+  const [txPending, setTxPending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(-1);
+  const [assetFilter, setAssetFilter] = useState(-1);
 
-  const { writeContractAsync, data: txHash } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
@@ -42,7 +46,6 @@ export default function WithdrawalsPage() {
   const { data: usdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
   const { data: reqCount, isLoading: reqLoading, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
 
-  // Batch-fetch all withdrawal requests by ID
   const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
   const { data: allRequestsRaw, refetch: refetchRequests } = useReadContracts({
     contracts: Array.from({ length: reqCountNum }, (_, i) => ({
@@ -54,7 +57,6 @@ export default function WithdrawalsPage() {
     query: { enabled: reqCountNum > 0 },
   });
 
-  // Filter to only show the connected user's requests
   const myRequests: WRequest[] = (allRequestsRaw ?? [])
     .map((r) => {
       const res = r.result as readonly [bigint, `0x${string}`, bigint, number, number, bigint] | undefined;
@@ -62,6 +64,12 @@ export default function WithdrawalsPage() {
       return { id: res[0], requester: res[1], amount: res[2], assetType: res[3], status: res[4], createdAt: res[5] } as WRequest;
     })
     .filter((r): r is WRequest => !!r && r.requester?.toLowerCase() === addr?.toLowerCase());
+
+  const filteredRequests = myRequests.filter((r) => {
+    if (statusFilter !== -1 && r.status !== statusFilter) return false;
+    if (assetFilter !== -1 && r.assetType !== assetFilter) return false;
+    return true;
+  });
 
   const fee = feeBps ? Number(feeBps as bigint) / 10000 : 0.02;
   const feeAmt = amount ? parseFloat(amount) * fee : 0;
@@ -72,6 +80,7 @@ export default function WithdrawalsPage() {
   const doRequest = async () => {
     if (!addr || !amount || parseFloat(amount) <= 0) return;
     if (parseFloat(amount) > bal) { setInputErr(`Insufficient balance (max ${bal.toFixed(2)} ${assetLabel})`); return; }
+    setTxPending(true);
     const parsed = parseUnits(amount, 18);
     const tokenAddr = asset === 0 ? CONTRACTS[chainId].azoraToken : CONTRACTS[chainId].usdt;
     try {
@@ -83,8 +92,12 @@ export default function WithdrawalsPage() {
       setTimeout(() => { refetchReqCount(); refetchRequests(); }, 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
+
+  const selectStyle = { background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" };
 
   return (
     <>
@@ -100,13 +113,15 @@ export default function WithdrawalsPage() {
                   <button
                     key={o.val}
                     onClick={() => { setAsset(o.val as 0 | 1); setAmount(""); }}
-                    className="flex-1 py-2.5 rounded-ctl border text-sm font-semibold transition-all"
+                    disabled={txPending}
+                    className="flex-1 py-2.5 rounded-ctl border text-sm font-semibold transition-all flex items-center justify-center gap-2"
                     style={{
                       borderColor: asset === o.val ? "var(--teal)" : "var(--line)",
                       background: asset === o.val ? "rgba(45,212,191,0.08)" : "var(--bg-2)",
                       color: asset === o.val ? "var(--teal)" : "var(--text-2)",
                     }}
                   >
+                    <TokenIcon symbol={o.label as "AZR" | "USDT"} size="sm" />
                     {o.label}
                   </button>
                 ))}
@@ -119,7 +134,7 @@ export default function WithdrawalsPage() {
                   Bal: {balLoading && !!addr ? <Skeleton className="inline-block w-16 h-3" /> : `${bal.toFixed(2)} ${assetLabel}`}
                 </span>
               </div>
-              <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setInputErr(""); }} />
+              <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setInputErr(""); }} disabled={txPending} />
             </div>
             <div className="space-y-2 mb-5 text-sm">
               <div className="flex justify-between">
@@ -132,14 +147,34 @@ export default function WithdrawalsPage() {
               </div>
             </div>
             {inputErr && <p className="text-xs mb-3" style={{ color: "#ff6b6b" }}>{inputErr}</p>}
-            <button className="az-btn-primary w-full" onClick={doRequest} disabled={confirming || !amount}>
-              {confirming ? t("submitting") : t("submit")}
+            {txPending && (
+              <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-ctl mb-3" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
+                <Spinner size="sm" /> Waiting for blockchain confirmation…
+              </div>
+            )}
+            <button className="az-btn-primary w-full" onClick={doRequest} disabled={txPending || !amount}>
+              {txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : t("submit")}
             </button>
           </div>
         </div>
 
         <div className="az-card">
-          <h3 className="font-semibold mb-4">{t("queue")}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="font-semibold">{t("queue")}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(Number(e.target.value))}>
+                <option value={-1}>All Status</option>
+                <option value={0}>Pending</option>
+                <option value={1}>Approved</option>
+                <option value={2}>Rejected</option>
+              </select>
+              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={assetFilter} onChange={(e) => setAssetFilter(Number(e.target.value))}>
+                <option value={-1}>All Assets</option>
+                <option value={0}>AZR</option>
+                <option value={1}>USDT</option>
+              </select>
+            </div>
+          </div>
           {reqLoading ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -163,8 +198,10 @@ export default function WithdrawalsPage() {
                 </tbody>
               </table>
             </div>
-          ) : myRequests.length === 0 ? (
-            <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>{t("noRequests")}</div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>
+              {myRequests.length === 0 ? t("noRequests") : "No requests match the current filters."}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -178,10 +215,15 @@ export default function WithdrawalsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {myRequests.map((req) => (
+                  {filteredRequests.map((req) => (
                     <tr key={req.id.toString()}>
                       <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
-                      <td className="py-3 text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</td>
+                      <td className="py-3">
+                        <span className="flex items-center gap-1.5">
+                          <TokenIcon symbol={ASSET_LABEL[req.assetType] as "AZR" | "USDT"} size="sm" />
+                          <span className="text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</span>
+                        </span>
+                      </td>
                       <td className="py-3 font-semibold az-mono">
                         {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
                       </td>
@@ -198,6 +240,11 @@ export default function WithdrawalsPage() {
                 </tbody>
               </table>
             </div>
+          )}
+          {myRequests.length > 0 && (
+            <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
+              Showing {filteredRequests.length} of {myRequests.length} requests
+            </p>
           )}
         </div>
       </div>

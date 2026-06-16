@@ -16,6 +16,7 @@ export default function ReferralsPage() {
   const { chainId } = useActiveChain();
   const [copied, setCopied] = useState(false);
   const [commissions, setCommissions] = useState<CommEntry[]>([]);
+  const [lvlFilter, setLvlFilter] = useState(-1);
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: userInfo } = useReadContract({
@@ -60,6 +61,8 @@ export default function ReferralsPage() {
   const totalForLevel = (lvl: number) =>
     commissions.filter((c) => c.level === lvl).reduce((s, c) => s + c.amount, BigInt(0));
 
+  const filteredCommissions = lvlFilter === -1 ? commissions : commissions.filter((c) => c.level === lvlFilter);
+
   const copy = () => {
     navigator.clipboard.writeText(refLink);
     setCopied(true);
@@ -103,44 +106,76 @@ export default function ReferralsPage() {
         </div>
 
         <div className="az-card">
-          <h3 className="font-semibold mb-4">{t("history")}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="font-semibold">{t("history")}</h3>
+            <div className="flex items-center gap-2">
+              <select
+                className="rounded-ctl px-3 py-1.5 text-xs az-mono"
+                style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+                value={lvlFilter}
+                onChange={(e) => setLvlFilter(Number(e.target.value))}
+              >
+                <option value={-1}>All Levels</option>
+                <option value={1}>L1 (6%)</option>
+                <option value={2}>L2 (4%)</option>
+                <option value={3}>L3 (3%)</option>
+              </select>
+              <button
+                className="az-btn-ghost text-xs px-3 py-1.5"
+                onClick={fetchCommissions}
+              >
+                ↻ Refresh
+              </button>
+            </div>
+          </div>
           {commissions.length === 0 ? (
-            <div className="flex flex-col items-center py-10" style={{ color: "var(--text-2)" }}>
+            <div className="flex flex-col items-center py-10 text-center" style={{ color: "var(--text-2)" }}>
               <p className="mb-2">{t("noEarnings")}</p>
-              <p className="text-sm" style={{ color: "var(--muted)" }}>{t("shareLink")}</p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>
+                Commissions appear here when users registered through your referral link stake AZR.
+              </p>
+            </div>
+          ) : filteredCommissions.length === 0 ? (
+            <div className="py-8 text-center text-sm" style={{ color: "var(--text-2)" }}>
+              No commissions for this level filter.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
-                    <th className="text-left pb-3 font-normal">Level</th>
-                    <th className="text-left pb-3 font-normal">From</th>
-                    <th className="text-right pb-3 font-normal">Amount (AZR)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {commissions.map((c, i) => (
-                    <tr key={i}>
-                      <td className="py-3">
-                        <span
-                          className="az-mono text-xs font-semibold px-2 py-0.5 rounded"
-                          style={{ background: "rgba(45,212,191,0.10)", color: "var(--teal)" }}
-                        >
-                          L{c.level}
-                        </span>
-                      </td>
-                      <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
-                        {c.from.slice(0, 6)}…{c.from.slice(-4)}
-                      </td>
-                      <td className="py-3 az-mono text-right font-semibold" style={{ color: "var(--teal)" }}>
-                        +{parseFloat(formatUnits(c.amount, 18)).toFixed(4)}
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                      <th className="text-left pb-3 font-normal">Level</th>
+                      <th className="text-left pb-3 font-normal">From</th>
+                      <th className="text-right pb-3 font-normal">Amount (AZR)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                    {filteredCommissions.map((c, i) => (
+                      <tr key={i}>
+                        <td className="py-3">
+                          <span
+                            className="az-mono text-xs font-semibold px-2 py-0.5 rounded"
+                            style={{ background: "rgba(45,212,191,0.10)", color: "var(--teal)" }}
+                          >
+                            L{c.level}
+                          </span>
+                        </td>
+                        <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
+                          {c.from.slice(0, 6)}…{c.from.slice(-4)}
+                        </td>
+                        <td className="py-3 az-mono text-right font-semibold" style={{ color: "var(--teal)" }}>
+                          +{parseFloat(formatUnits(c.amount, 18)).toFixed(4)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
+                Showing {filteredCommissions.length} of {commissions.length} commissions
+              </p>
+            </>
           )}
         </div>
       </div>

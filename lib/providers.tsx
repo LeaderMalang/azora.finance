@@ -17,6 +17,7 @@ export function Providers({ children, cookie }: { children: ReactNode; cookie?: 
       wagmiConfig,
       projectId,
       defaultChain: targetChain,
+      allowUnsupportedChain: true,
       themeMode: "dark",
       themeVariables: { "--w3m-accent": "#2dd4bf", "--w3m-border-radius-master": "12px" },
     });

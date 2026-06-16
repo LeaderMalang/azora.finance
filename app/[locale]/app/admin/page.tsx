@@ -1,8 +1,10 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract } from "wagmi";
 import { CONTRACTS, STAKING_ABI, ERC20_ABI } from "@/lib/contracts";
+import { Spinner } from "@/components/ui/Spinner";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits, isAddress } from "viem";
 import { useState } from "react";
@@ -22,8 +24,7 @@ export default function AdminPage() {
   const { address: addr } = useAccount();
   const { toast } = useToast();
   const { chainId } = useActiveChain();
-  const { writeContractAsync, data: txHash } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { writeContractAsync } = useWriteContract();
 
   // Current values
   const { data: owner } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "owner", query: { enabled: true } });
@@ -72,6 +73,14 @@ export default function AdminPage() {
     const res = r.result as [string, string, boolean] | undefined;
     return res?.[1] ?? "";
   });
+
+  // Transaction state
+  const [txPending, setTxPending] = useState(false);
+
+  // Withdrawal table filters
+  const [wSearch, setWSearch] = useState("");
+  const [wStatusFilter, setWStatusFilter] = useState(-1);
+  const [wAssetFilter, setWAssetFilter] = useState(-1);
 
   // Form state
   const [usdtDepositAmt, setUsdtDepositAmt] = useState("");
@@ -124,13 +133,30 @@ export default function AdminPage() {
     );
   }
 
+  const filteredRequests = allRequests
+    .map((req, idx) => ({ req, idx }))
+    .filter(({ req, idx }) => {
+      if (wStatusFilter !== -1 && req.status !== wStatusFilter) return false;
+      if (wAssetFilter !== -1 && req.assetType !== wAssetFilter) return false;
+      if (wSearch) {
+        const q = wSearch.toLowerCase();
+        const name = (requestUsernames[idx] ?? "").toLowerCase();
+        const addr2 = req.requester.toLowerCase();
+        if (!name.includes(q) && !addr2.includes(q)) return false;
+      }
+      return true;
+    });
+
   const exec = async (fn: () => Promise<unknown>, successMsg: string, refetch?: () => void) => {
+    setTxPending(true);
     try {
       await fn();
       toast(successMsg);
       setTimeout(() => refetch?.(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 120) : "Transaction failed", "error");
+    } finally {
+      setTxPending(false);
     }
   };
 
@@ -169,7 +195,7 @@ export default function AdminPage() {
               <input className="az-input flex-1" placeholder="Days (e.g. 14)" value={lockDays} onChange={(e) => setLockDays(e.target.value)} type="number" />
               <button
                 className="az-btn-primary px-4"
-                disabled={confirming || !lockDays}
+                disabled={txPending || !lockDays}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "setLockPeriod", args: [BigInt(Math.round(parseFloat(lockDays) * 86400))] }),
                   `Lock period set to ${lockDays} days`,
@@ -193,7 +219,7 @@ export default function AdminPage() {
               <input className="az-input flex-1" placeholder="Amount in AZR" value={minStakeInput} onChange={(e) => setMinStakeInput(e.target.value)} type="number" />
               <button
                 className="az-btn-primary px-4"
-                disabled={confirming || !minStakeInput}
+                disabled={txPending || !minStakeInput}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "setMinStake", args: [parseUnits(minStakeInput, 18)] }),
                   `Min stake set to ${minStakeInput} AZR`,
@@ -210,7 +236,7 @@ export default function AdminPage() {
               <input className="az-input flex-1" placeholder="Basis points (e.g. 200 = 2%)" value={feeInput} onChange={(e) => setFeeInput(e.target.value)} type="number" />
               <button
                 className="az-btn-primary px-4"
-                disabled={confirming || !feeInput}
+                disabled={txPending || !feeInput}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "setWithdrawalFee", args: [BigInt(feeInput)] }),
                   `Withdrawal fee set to ${Number(feeInput) / 100}%`,
@@ -241,7 +267,7 @@ export default function AdminPage() {
             </div>
             <button
               className="az-btn-primary w-full"
-              disabled={confirming || !l1Input || !l2Input || !l3Input}
+              disabled={txPending || !l1Input || !l2Input || !l3Input}
               onClick={() => exec(
                 () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "setReferralRates", args: [BigInt(l1Input), BigInt(l2Input), BigInt(l3Input)] }),
                 "Referral rates updated",
@@ -267,7 +293,7 @@ export default function AdminPage() {
               <button
                 className="az-btn-primary px-4"
                 disabled={
-                  confirming ||
+                  txPending ||
                   !usdtDepositAmt ||
                   parseFloat(usdtDepositAmt || "0") > (adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)) : 0)
                 }
@@ -314,7 +340,7 @@ export default function AdminPage() {
               </div>
               <button
                 className="az-btn-primary w-full"
-                disabled={confirming || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") > targetStakedAmt || targetStakedAmt === 0}
+                disabled={txPending || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") > targetStakedAmt || targetStakedAmt === 0}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "debitAccount", args: [debitAddr as `0x${string}`, parseUnits(debitAmt, 18)] }),
                   `Debited ${debitAmt} AZR from ${debitAddr.slice(0, 8)}…`,
@@ -334,7 +360,7 @@ export default function AdminPage() {
             <div className="flex gap-2">
               <button
                 className="az-btn-primary flex-1"
-                disabled={confirming || !withdrawId}
+                disabled={txPending || !withdrawId}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "approveWithdrawal", args: [BigInt(withdrawId)] }),
                   `Withdrawal #${withdrawId} approved`,
@@ -343,7 +369,7 @@ export default function AdminPage() {
               >✓ Approve</button>
               <button
                 className="az-btn-ghost flex-1"
-                disabled={confirming || !withdrawId}
+                disabled={txPending || !withdrawId}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "rejectWithdrawal", args: [BigInt(withdrawId)] }),
                   `Withdrawal #${withdrawId} rejected`,
@@ -357,83 +383,126 @@ export default function AdminPage() {
 
         {/* All withdrawal requests list */}
         <AdminCard title="All Withdrawal Requests">
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <input
+              className="az-input h-8 text-sm flex-1 min-w-[150px]"
+              placeholder="Search username or address…"
+              value={wSearch}
+              onChange={(e) => setWSearch(e.target.value)}
+              style={{ minWidth: 150 }}
+            />
+            <select
+              className="rounded-ctl px-3 py-1.5 text-xs az-mono"
+              style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={wStatusFilter}
+              onChange={(e) => setWStatusFilter(Number(e.target.value))}
+            >
+              <option value={-1}>All Status</option>
+              <option value={0}>Pending</option>
+              <option value={1}>Approved</option>
+              <option value={2}>Rejected</option>
+            </select>
+            <select
+              className="rounded-ctl px-3 py-1.5 text-xs az-mono"
+              style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={wAssetFilter}
+              onChange={(e) => setWAssetFilter(Number(e.target.value))}
+            >
+              <option value={-1}>All Assets</option>
+              <option value={0}>AZR</option>
+              <option value={1}>USDT</option>
+            </select>
+          </div>
           {allRequests.length === 0 ? (
             <p className="text-sm py-4 text-center" style={{ color: "var(--text-2)" }}>No withdrawal requests yet.</p>
+          ) : filteredRequests.length === 0 ? (
+            <p className="text-sm py-4 text-center" style={{ color: "var(--text-2)" }}>No requests match the current filters.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
-                    <th className="text-left pb-3 font-normal">#</th>
-                    <th className="text-left pb-3 font-normal">Requester</th>
-                    <th className="text-left pb-3 font-normal">Asset</th>
-                    <th className="text-left pb-3 font-normal">Amount</th>
-                    <th className="text-left pb-3 font-normal">Status</th>
-                    <th className="text-left pb-3 font-normal">Date</th>
-                    <th className="text-right pb-3 font-normal">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {allRequests.map((req, index) => {
-                    const ASSET_LABEL = ["AZR", "USDT"];
-                    const STATUS_LABEL = ["Pending", "Approved", "Rejected"];
-                    const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
-                    const isPending = req.status === 0;
-                    return (
-                      <tr key={req.id.toString()}>
-                        <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
-                        <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
-                          {requestUsernames[index] && (
-                            <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--text)" }}>
-                              {requestUsernames[index]}
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                      <th className="text-left pb-3 font-normal">#</th>
+                      <th className="text-left pb-3 font-normal">Requester</th>
+                      <th className="text-left pb-3 font-normal">Asset</th>
+                      <th className="text-left pb-3 font-normal">Amount</th>
+                      <th className="text-left pb-3 font-normal">Status</th>
+                      <th className="text-left pb-3 font-normal">Date</th>
+                      <th className="text-right pb-3 font-normal">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                    {filteredRequests.map(({ req, idx }) => {
+                      const ASSET_LABEL = ["AZR", "USDT"];
+                      const STATUS_LABEL = ["Pending", "Approved", "Rejected"];
+                      const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
+                      const isPending = req.status === 0;
+                      return (
+                        <tr key={req.id.toString()}>
+                          <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
+                          <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
+                            {requestUsernames[idx] && (
+                              <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--text)" }}>
+                                {requestUsernames[idx]}
+                              </div>
+                            )}
+                            <div title={req.requester}>
+                              {req.requester.slice(0, 8)}…{req.requester.slice(-6)}
                             </div>
-                          )}
-                          <div title={req.requester}>
-                            {req.requester.slice(0, 8)}…{req.requester.slice(-6)}
-                          </div>
-                        </td>
-                        <td className="py-3 text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</td>
-                        <td className="py-3 font-semibold az-mono">
-                          {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
-                        </td>
-                        <td className="py-3">
-                          <span className="az-mono text-xs font-semibold" style={{ color: STATUS_COLOR[req.status] ?? "var(--text-2)" }}>
-                            {STATUS_LABEL[req.status] ?? "Unknown"}
-                          </span>
-                        </td>
-                        <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
-                          {new Date(Number(req.createdAt) * 1000).toLocaleDateString()}
-                        </td>
-                        <td className="py-3">
-                          {isPending && (
-                            <div className="flex gap-1.5 justify-end">
-                              <button
-                                className="az-btn-primary text-xs px-2.5 py-1"
-                                disabled={confirming}
-                                onClick={() => exec(
-                                  () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "approveWithdrawal", args: [req.id] }),
-                                  `Withdrawal #${Number(req.id)} approved`,
-                                  () => { refetchAllRequests(); refetchReqCount(); },
-                                )}
-                              >✓</button>
-                              <button
-                                className="az-btn-ghost text-xs px-2.5 py-1"
-                                disabled={confirming}
-                                onClick={() => exec(
-                                  () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "rejectWithdrawal", args: [req.id] }),
-                                  `Withdrawal #${Number(req.id)} rejected`,
-                                  () => { refetchAllRequests(); refetchReqCount(); },
-                                )}
-                              >✗</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="py-3">
+                            <span className="flex items-center gap-1.5">
+                              <TokenIcon symbol={ASSET_LABEL[req.assetType] as "AZR" | "USDT"} size="sm" />
+                              <span className="text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 font-semibold az-mono">
+                            {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
+                          </td>
+                          <td className="py-3">
+                            <span className="az-mono text-xs font-semibold" style={{ color: STATUS_COLOR[req.status] ?? "var(--text-2)" }}>
+                              {STATUS_LABEL[req.status] ?? "Unknown"}
+                            </span>
+                          </td>
+                          <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
+                            {new Date(Number(req.createdAt) * 1000).toLocaleDateString()}
+                          </td>
+                          <td className="py-3">
+                            {isPending && (
+                              <div className="flex gap-1.5 justify-end">
+                                <button
+                                  className="az-btn-primary text-xs px-2.5 py-1"
+                                  disabled={txPending}
+                                  onClick={() => exec(
+                                    () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "approveWithdrawal", args: [req.id] }),
+                                    `Withdrawal #${Number(req.id)} approved`,
+                                    () => { refetchAllRequests(); refetchReqCount(); },
+                                  )}
+                                >{txPending ? <Spinner size="sm" /> : "✓"}</button>
+                                <button
+                                  className="az-btn-ghost text-xs px-2.5 py-1"
+                                  disabled={txPending}
+                                  onClick={() => exec(
+                                    () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "rejectWithdrawal", args: [req.id] }),
+                                    `Withdrawal #${Number(req.id)} rejected`,
+                                    () => { refetchAllRequests(); refetchReqCount(); },
+                                  )}
+                                >✗</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
+                Showing {filteredRequests.length} of {allRequests.length} requests
+              </p>
+            </>
           )}
         </AdminCard>
 
@@ -445,7 +514,7 @@ export default function AdminPage() {
           <div className="flex gap-3">
             <button
               className="az-btn-ghost flex-1"
-              disabled={confirming || !!isPaused}
+              disabled={txPending || !!isPaused}
               onClick={() => exec(
                 () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "pause", args: [] }),
                 "Contract paused",
@@ -454,7 +523,7 @@ export default function AdminPage() {
             >⏸ Pause Contract</button>
             <button
               className="az-btn-primary flex-1"
-              disabled={confirming || !isPaused}
+              disabled={txPending || !isPaused}
               onClick={() => exec(
                 () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unpause", args: [] }),
                 "Contract unpaused — all operations resumed",
