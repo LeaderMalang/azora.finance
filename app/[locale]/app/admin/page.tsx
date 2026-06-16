@@ -51,7 +51,11 @@ export default function AdminPage() {
     query: { enabled: reqCountNum > 0 },
   });
   const allRequests: WRequest[] = (allRequestsRaw ?? [])
-    .map((r) => r.result as WRequest | undefined)
+    .map((r) => {
+      const res = r.result as readonly [bigint, `0x${string}`, bigint, number, number, bigint] | undefined;
+      if (!res) return undefined;
+      return { id: res[0], requester: res[1], amount: res[2], assetType: res[3], status: res[4], createdAt: res[5] } as WRequest;
+    })
     .filter((r): r is WRequest => !!r);
 
   // Batch-fetch usernames for each withdrawal requester
