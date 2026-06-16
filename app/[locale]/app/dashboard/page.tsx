@@ -2,9 +2,10 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract } from "wagmi";
-import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
+import { CONTRACTS, STAKING_ABI, ERC20_ABI } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits } from "viem";
 import { useEffect, useState } from "react";
@@ -19,6 +20,42 @@ function KpiCard({ label, value, unit, sub, glow }: { label: string; value: stri
         {value} {unit && <span className="text-xl font-normal" style={{ color: "var(--muted)" }}>{unit}</span>}
       </div>
       {sub && <div className="text-xs" style={{ color: "var(--muted)" }}>{sub}</div>}
+    </div>
+  );
+}
+
+function WalletCard({ azr, usdt, loading }: { azr: number; usdt: number; loading: boolean }) {
+  return (
+    <div className="az-card">
+      <div className="text-xs az-mono mb-3" style={{ color: "var(--muted)" }}>Available Balance</div>
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-full" />
+          <Skeleton className="h-5 w-full" />
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <TokenIcon symbol="AZR" size="sm" />
+              <span className="az-mono text-xs font-semibold">AZR</span>
+            </span>
+            <span className="font-bold az-mono text-sm" style={{ color: "var(--teal)" }}>
+              {azr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <TokenIcon symbol="USDT" size="sm" />
+              <span className="az-mono text-xs font-semibold">USDT</span>
+            </span>
+            <span className="font-bold az-mono text-sm">
+              {usdt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
+      <div className="text-xs mt-3" style={{ color: "var(--muted)" }}>Ready to stake · swap · withdraw</div>
     </div>
   );
 }
@@ -51,12 +88,32 @@ export default function DashboardPage() {
     query: { enabled: !!addr },
   });
 
+  const { data: azrWalBal, isLoading: azrLoading } = useReadContract({
+    address: CONTRACTS[chainId].azoraToken,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr },
+  });
+
+  const { data: usdtWalBal, isLoading: usdtLoading } = useReadContract({
+    address: CONTRACTS[chainId].usdt,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: addr ? [addr] : undefined,
+    query: { enabled: !!addr },
+  });
+
   const [pendingDisplay, setPendingDisplay] = useState<string>("0.0000");
 
   const positions: StakePosition[] = (rawPositions as StakePosition[] | undefined) ?? [];
   const activePositions = positions.filter((p) => p.active);
   const staked = activePositions.reduce((s, p) => s + parseFloat(formatUnits(p.amount, 18)), 0);
   const hasStake = activePositions.length > 0;
+
+  const azrWallet = azrWalBal ? parseFloat(formatUnits(azrWalBal as bigint, 18)) : 0;
+  const usdtWallet = usdtWalBal ? parseFloat(formatUnits(usdtWalBal as bigint, 18)) : 0;
+  const walletLoading = (azrLoading || usdtLoading) && !!addr;
 
   useEffect(() => {
     if (!hasStake) return;
@@ -76,9 +133,10 @@ export default function DashboardPage() {
     <>
       <AppTopbar title={t("title")} sub="Your positions, earnings & rewards" />
       <div className="p-4 md:p-8 max-w-app">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8">
           {loading ? (
             <>
+              <SkeletonKpiCard />
               <SkeletonKpiCard />
               <SkeletonKpiCard />
               <SkeletonKpiCard />
@@ -89,7 +147,8 @@ export default function DashboardPage() {
               <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? `${activePositions.length} active position${activePositions.length !== 1 ? "s" : ""}` : "No active stake"} glow />
               <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
               <KpiCard label={t("portfolio")} value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" />
-              <KpiCard label={t("referralEarnings")} value="—" unit="AZR" />
+              <KpiCard label={t("referralEarnings")} value="—" unit="AZR" sub="See Referrals page" />
+              <WalletCard azr={azrWallet} usdt={usdtWallet} loading={walletLoading} />
             </>
           )}
         </div>

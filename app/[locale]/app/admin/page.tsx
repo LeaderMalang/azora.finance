@@ -7,7 +7,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits, isAddress } from "viem";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/Toast";
 
 function AdminCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -19,14 +19,13 @@ function AdminCard({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
-
 export default function AdminPage() {
   const { address: addr } = useAccount();
   const { toast } = useToast();
   const { chainId } = useActiveChain();
   const { writeContractAsync } = useWriteContract();
 
-  // Current values
+  // Protocol reads
   const { data: owner } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "owner", query: { enabled: true } });
   const { data: lockPeriod, refetch: refetchLock } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "lockPeriod", query: { enabled: true } });
   const { data: minStake, refetch: refetchMin } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "minStakeAmount", query: { enabled: true } });
@@ -36,8 +35,20 @@ export default function AdminPage() {
   const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
   const { data: isPaused, refetch: refetchPaused } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "paused", query: { enabled: true } });
   const { data: reqCount, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+
+  // Pool balances
   const { data: poolUsdtBal, refetch: refetchPoolBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: [CONTRACTS[chainId].staking], query: { enabled: true } });
+  const { data: poolAzrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: [CONTRACTS[chainId].staking], query: { enabled: true } });
+
+  // Admin wallet balances
   const { data: adminUsdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: adminAzrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+
+  // DB stats
+  const [dbStats, setDbStats] = useState<{ userCount: number; referralTotal: string } | null>(null);
+  useEffect(() => {
+    fetch("/api/admin/stats").then((r) => r.json()).then(setDbStats).catch(() => {});
+  }, []);
 
   // Batch-fetch all withdrawal requests
   const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
@@ -59,7 +70,7 @@ export default function AdminPage() {
     })
     .filter((r): r is WRequest => !!r);
 
-  // Batch-fetch usernames for each withdrawal requester
+  // Batch-fetch usernames for withdrawal requesters
   const { data: usernamesRaw } = useReadContracts({
     contracts: allRequests.map((req) => ({
       address: CONTRACTS[chainId].staking as `0x${string}`,
@@ -73,6 +84,11 @@ export default function AdminPage() {
     const res = r.result as [string, string, boolean] | undefined;
     return res?.[1] ?? "";
   });
+
+  // Withdrawal stats
+  const pendingCount = allRequests.filter((r) => r.status === 0).length;
+  const approvedCount = allRequests.filter((r) => r.status === 1).length;
+  const rejectedCount = allRequests.filter((r) => r.status === 2).length;
 
   // Transaction state
   const [txPending, setTxPending] = useState(false);
@@ -91,10 +107,12 @@ export default function AdminPage() {
   const [l2Input, setL2Input] = useState("");
   const [l3Input, setL3Input] = useState("");
   const [debitAmt, setDebitAmt] = useState("");
-  const [debitAddr, setDebitAddr] = useState<string>("");
+  const [debitAddr, setDebitAddr] = useState("");
+  const [creditAmt, setCreditAmt] = useState("");
+  const [creditAddr, setCreditAddr] = useState("");
   const [withdrawId, setWithdrawId] = useState("");
 
-  // Live staked balance for the debit target — prevents "unlimited gas" from over-debit
+  // Live staked balance for debit target
   const { data: targetStaked } = useReadContract({
     address: CONTRACTS[chainId].staking,
     abi: STAKING_ABI,
@@ -160,13 +178,37 @@ export default function AdminPage() {
     }
   };
 
+  const fmt = (v: bigint | undefined, decimals = 18, dp = 2) =>
+    v !== undefined ? parseFloat(formatUnits(v, decimals)).toFixed(dp) : "—";
+
   return (
     <>
       <AppTopbar title="Admin Panel" sub="Owner-only contract controls · handle with care" />
       <div className="p-4 md:p-8 max-w-app space-y-6">
 
-        {/* Status strip */}
+        {/* Stats overview */}
         <div className="az-card-glow">
+          <h3 className="font-semibold mb-4 text-sm">Platform Overview</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: "AZR Pool", value: fmt(poolAzrBal as bigint | undefined), unit: "AZR", color: "var(--teal)" },
+              { label: "USDT Pool", value: fmt(poolUsdtBal as bigint | undefined), unit: "USDT", color: "var(--teal)" },
+              { label: "Total Users", value: dbStats ? String(dbStats.userCount) : "…", unit: "", color: "var(--text)" },
+              { label: "Referral Paid", value: dbStats ? dbStats.referralTotal : "…", unit: "AZR", color: "var(--text)" },
+              { label: "Pending W/D", value: reqCount !== undefined ? String(pendingCount) : "…", unit: "", color: pendingCount > 0 ? "var(--warn)" : "var(--text)" },
+              { label: "Total W/D Req", value: reqCount !== undefined ? String(reqCountNum) : "…", unit: `(${approvedCount}✓ ${rejectedCount}✗)`, color: "var(--text)" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-ctl px-3 py-3 text-center" style={{ background: "var(--bg-2)" }}>
+                <div className="text-[10px] az-mono mb-1" style={{ color: "var(--muted)" }}>{s.label}</div>
+                <div className="font-bold az-mono text-sm" style={{ color: s.color }}>{s.value}</div>
+                {s.unit && <div className="text-[10px] az-mono mt-0.5" style={{ color: "var(--muted)" }}>{s.unit}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Protocol state */}
+        <div className="az-card">
           <h3 className="font-semibold mb-4 text-sm">Current Protocol State</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -278,54 +320,45 @@ export default function AdminPage() {
 
           {/* USDT liquidity deposit */}
           <AdminCard title="Deposit USDT Liquidity">
-            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-              Pool balance: <strong style={{ color: "var(--teal)" }}>{poolUsdtBal ? parseFloat(formatUnits(poolUsdtBal as bigint, 18)).toFixed(2) : "—"} USDT</strong>
+            <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>
+              Pool: <strong style={{ color: "var(--teal)" }}>{poolUsdtBal ? parseFloat(formatUnits(poolUsdtBal as bigint, 18)).toFixed(2) : "—"} USDT</strong>
               &nbsp;·&nbsp;Your wallet: {adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)).toFixed(2) : "—"} USDT
             </p>
+            <p className="text-[11px] az-mono mb-3" style={{ color: "var(--muted)", opacity: 0.7 }}>
+              On mainnet: deposit real USDT here to fund the swap reserve. On testnet, USDT must be sourced separately (faucet or test contract).
+            </p>
             <div className="flex gap-2">
-              <input
-                className="az-input flex-1"
-                placeholder="USDT amount"
-                value={usdtDepositAmt}
-                onChange={(e) => setUsdtDepositAmt(e.target.value)}
-                type="number"
-              />
+              <input className="az-input flex-1" placeholder="USDT amount" value={usdtDepositAmt} onChange={(e) => setUsdtDepositAmt(e.target.value)} type="number" />
               <button
                 className="az-btn-primary px-4"
-                disabled={
-                  txPending ||
-                  !usdtDepositAmt ||
-                  parseFloat(usdtDepositAmt || "0") > (adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)) : 0)
-                }
+                disabled={txPending || !usdtDepositAmt || parseFloat(usdtDepositAmt || "0") > (adminUsdtBal ? parseFloat(formatUnits(adminUsdtBal as bigint, 18)) : 0)}
                 onClick={() => exec(
-                  () => writeContractAsync({
-                    address: CONTRACTS[chainId].usdt,
-                    abi: ERC20_ABI,
-                    functionName: "transfer",
-                    args: [CONTRACTS[chainId].staking, parseUnits(usdtDepositAmt, 18)],
-                  }),
+                  () => writeContractAsync({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "transfer", args: [CONTRACTS[chainId].staking, parseUnits(usdtDepositAmt, 18)] }),
                   `Deposited ${usdtDepositAmt} USDT into pool`,
                   refetchPoolBal,
                 )}
               >Deposit</button>
             </div>
             {adminUsdtBal !== undefined && usdtDepositAmt && parseFloat(usdtDepositAmt) > parseFloat(formatUnits(adminUsdtBal as bigint, 18)) && (
-              <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>
-                Exceeds your wallet balance ({parseFloat(formatUnits(adminUsdtBal as bigint, 18)).toFixed(2)} USDT)
-              </p>
+              <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>Exceeds your wallet balance</p>
             )}
           </AdminCard>
 
           {/* Debit account */}
           <AdminCard title="Debit User Account">
-            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>Deducts AZR from a user&apos;s staked balance. Enter the wallet address directly.</p>
+            <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>
+              Deducts AZR from a user&apos;s staked balance. The contract removes from the user&apos;s oldest active stake first, then continues to the next until the full amount is covered.
+            </p>
+            <p className="text-[11px] az-mono mb-3" style={{ color: "var(--muted)", opacity: 0.7 }}>
+              If the user has 3 positions (500, 300, 200 AZR) and you debit 600 AZR, position #1 is fully removed and 100 AZR is taken from position #2.
+            </p>
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Wallet Address</label>
                 <input className="az-input" placeholder="0x..." value={debitAddr} onChange={(e) => setDebitAddr(e.target.value)} />
                 {isAddress(debitAddr) && (
                   <p className="text-[11px] az-mono mt-1" style={{ color: "var(--muted)" }}>
-                    Staked balance: <span style={{ color: "var(--teal)" }}>{targetStakedAmt.toFixed(4)} AZR</span>
+                    Total staked: <span style={{ color: "var(--teal)" }}>{targetStakedAmt.toFixed(4)} AZR</span>
                   </p>
                 )}
               </div>
@@ -333,26 +366,62 @@ export default function AdminPage() {
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (AZR)</label>
                 <input className="az-input" placeholder="0.00" value={debitAmt} onChange={(e) => setDebitAmt(e.target.value)} type="number" />
                 {isAddress(debitAddr) && debitAmt && parseFloat(debitAmt) > targetStakedAmt && (
-                  <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>
-                    Exceeds staked balance ({targetStakedAmt.toFixed(4)} AZR)
-                  </p>
+                  <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>Exceeds staked balance</p>
                 )}
               </div>
               <button
                 className="az-btn-primary w-full"
+                style={{ background: "rgba(239,68,68,0.15)", borderColor: "#ef4444", color: "#ef4444" }}
                 disabled={txPending || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") > targetStakedAmt || targetStakedAmt === 0}
                 onClick={() => exec(
                   () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "debitAccount", args: [debitAddr as `0x${string}`, parseUnits(debitAmt, 18)] }),
                   `Debited ${debitAmt} AZR from ${debitAddr.slice(0, 8)}…`,
                 )}
-              >Debit Account</button>
+              >{txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Debit Account"}</button>
             </div>
           </AdminCard>
 
-          {/* Withdrawal management */}
+          {/* Credit account (AZR transfer to wallet) */}
+          <AdminCard title="Credit User Wallet">
+            <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>
+              Sends AZR tokens directly to a user&apos;s wallet from your admin wallet. The user can then stake those tokens.
+            </p>
+            <p className="text-[11px] az-mono mb-3" style={{ color: "var(--muted)", opacity: 0.7 }}>
+              Your AZR balance: <span style={{ color: "var(--teal)" }}>{adminAzrBal ? parseFloat(formatUnits(adminAzrBal as bigint, 18)).toFixed(2) : "—"} AZR</span>
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Recipient Wallet</label>
+                <input className="az-input" placeholder="0x..." value={creditAddr} onChange={(e) => setCreditAddr(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (AZR)</label>
+                <input className="az-input" placeholder="0.00" value={creditAmt} onChange={(e) => setCreditAmt(e.target.value)} type="number" />
+                {isAddress(creditAddr) && creditAmt && adminAzrBal && parseFloat(creditAmt) > parseFloat(formatUnits(adminAzrBal as bigint, 18)) && (
+                  <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>Exceeds your AZR balance</p>
+                )}
+              </div>
+              <button
+                className="az-btn-primary w-full"
+                disabled={
+                  txPending || !creditAmt || !isAddress(creditAddr) ||
+                  (!!adminAzrBal && parseFloat(creditAmt || "0") > parseFloat(formatUnits(adminAzrBal as bigint, 18)))
+                }
+                onClick={() => exec(
+                  () => writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "transfer", args: [creditAddr as `0x${string}`, parseUnits(creditAmt, 18)] }),
+                  `Sent ${creditAmt} AZR to ${creditAddr.slice(0, 8)}…`,
+                )}
+              >{txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Credit Wallet"}</button>
+            </div>
+          </AdminCard>
+
+          {/* Withdrawal request controls */}
           <AdminCard title="Withdrawal Requests">
             <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
-              Total requests on-chain: <strong>{reqCount !== undefined ? Number(reqCount as bigint).toString() : "—"}</strong>
+              Total: <strong>{reqCount !== undefined ? Number(reqCount as bigint) : "—"}</strong> &nbsp;·&nbsp;
+              Pending: <strong style={{ color: pendingCount > 0 ? "var(--warn)" : "var(--text)" }}>{pendingCount}</strong> &nbsp;·&nbsp;
+              Approved: <strong style={{ color: "var(--teal)" }}>{approvedCount}</strong> &nbsp;·&nbsp;
+              Rejected: <strong style={{ color: "#ef4444" }}>{rejectedCount}</strong>
             </p>
             <div className="flex gap-2 mb-3">
               <input className="az-input flex-1" placeholder="Request ID (number)" value={withdrawId} onChange={(e) => setWithdrawId(e.target.value)} type="number" />
@@ -366,7 +435,7 @@ export default function AdminPage() {
                   `Withdrawal #${withdrawId} approved`,
                   () => { refetchAllRequests(); refetchReqCount(); },
                 )}
-              >✓ Approve</button>
+              >{txPending ? <Spinner size="sm" /> : "✓ Approve"}</button>
               <button
                 className="az-btn-ghost flex-1"
                 disabled={txPending || !withdrawId}
@@ -379,18 +448,34 @@ export default function AdminPage() {
             </div>
           </AdminCard>
 
+          {/* Features requiring contract upgrade */}
+          <AdminCard title="Planned Features">
+            <div className="space-y-3 text-sm">
+              <div className="rounded-ctl px-4 py-3" style={{ background: "rgba(243,186,47,0.08)", borderLeft: "2px solid #f3ba2f" }}>
+                <div className="font-semibold text-xs mb-1" style={{ color: "#f3ba2f" }}>Wallet Blacklist</div>
+                <p className="text-xs" style={{ color: "var(--text-2)" }}>
+                  Blocking a wallet from staking on-chain requires a <code>blacklistWallet(address)</code> function in the smart contract. This is not in the current contract — add it in v2 and the admin UI will expose it automatically.
+                </p>
+              </div>
+              <div className="rounded-ctl px-4 py-3" style={{ background: "rgba(243,186,47,0.08)", borderLeft: "2px solid #f3ba2f" }}>
+                <div className="font-semibold text-xs mb-1" style={{ color: "#f3ba2f" }}>USDT Receiving Wallet</div>
+                <p className="text-xs" style={{ color: "var(--text-2)" }}>
+                  Currently, USDT from swaps stays inside the staking contract. To redirect it to an external wallet, the contract needs a <code>setTreasury(address)</code> function and a withdrawal mechanism. Add this in v2.
+                </p>
+              </div>
+            </div>
+          </AdminCard>
+
         </div>
 
-        {/* All withdrawal requests list */}
+        {/* All withdrawal requests table */}
         <AdminCard title="All Withdrawal Requests">
-          {/* Filter bar */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <input
               className="az-input h-8 text-sm flex-1 min-w-[150px]"
               placeholder="Search username or address…"
               value={wSearch}
               onChange={(e) => setWSearch(e.target.value)}
-              style={{ minWidth: 150 }}
             />
             <select
               className="rounded-ctl px-3 py-1.5 text-xs az-mono"
@@ -444,13 +529,9 @@ export default function AdminPage() {
                           <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{Number(req.id)}</td>
                           <td className="py-3 az-mono text-xs" style={{ color: "var(--text-2)" }}>
                             {requestUsernames[idx] && (
-                              <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--text)" }}>
-                                {requestUsernames[idx]}
-                              </div>
+                              <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--text)" }}>{requestUsernames[idx]}</div>
                             )}
-                            <div title={req.requester}>
-                              {req.requester.slice(0, 8)}…{req.requester.slice(-6)}
-                            </div>
+                            <div title={req.requester}>{req.requester.slice(0, 8)}…{req.requester.slice(-6)}</div>
                           </td>
                           <td className="py-3">
                             <span className="flex items-center gap-1.5">
@@ -458,9 +539,7 @@ export default function AdminPage() {
                               <span className="text-xs font-semibold">{ASSET_LABEL[req.assetType] ?? "?"}</span>
                             </span>
                           </td>
-                          <td className="py-3 font-semibold az-mono">
-                            {parseFloat(formatUnits(req.amount, 18)).toFixed(4)}
-                          </td>
+                          <td className="py-3 font-semibold az-mono">{parseFloat(formatUnits(req.amount, 18)).toFixed(4)}</td>
                           <td className="py-3">
                             <span className="az-mono text-xs font-semibold" style={{ color: STATUS_COLOR[req.status] ?? "var(--text-2)" }}>
                               {STATUS_LABEL[req.status] ?? "Unknown"}
@@ -509,7 +588,7 @@ export default function AdminPage() {
         {/* Pause / unpause */}
         <AdminCard title="Contract Circuit Breaker">
           <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
-            Pausing the contract prevents all stake, swap, claim, and withdrawal operations. Use only in emergencies.
+            Pausing prevents all stake, swap, claim, and withdrawal operations. Use only in emergencies.
           </p>
           <div className="flex gap-3">
             <button

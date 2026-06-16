@@ -212,7 +212,7 @@ export function ConnectModal() {
                 </div>
                 <div>
                   <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>
-                    Referral username <span style={{ color: "var(--muted)", opacity: 0.6 }}>(optional)</span>
+                    Referrer username <span style={{ color: "var(--muted)", opacity: 0.6 }}>(optional)</span>
                   </label>
                   <input
                     className="az-input"

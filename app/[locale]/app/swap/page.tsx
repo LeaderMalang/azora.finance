@@ -39,7 +39,8 @@ export default function SwapPage() {
       const approveHash = await writeContractAsync({ address: approveAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
       await publicClient!.waitForTransactionReceipt({ hash: approveHash });
       const fn = dir === "buy" ? "swapUSDTForToken" : "swapTokenForUSDT";
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: fn, args: [parsed] });
+      const swapHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: fn, args: [parsed] });
+      await publicClient!.waitForTransactionReceipt({ hash: swapHash });
       toast(`Swapped ${amount} ${fromLabel} → ${toLabel}`);
       setAmount("");
       refetchUsdt();

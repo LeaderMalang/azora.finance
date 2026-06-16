@@ -130,7 +130,7 @@ export default function StakePage() {
       await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
       refetchBalance();
-      fetchClaimHistory();
+      setTimeout(() => fetchClaimHistory(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     } finally {
@@ -147,7 +147,7 @@ export default function StakePage() {
       await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
       refetchBalance();
-      fetchClaimHistory();
+      setTimeout(() => fetchClaimHistory(), 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     } finally {
