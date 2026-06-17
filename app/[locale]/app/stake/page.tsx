@@ -166,13 +166,15 @@ export default function StakePage() {
       refetchBalance();
       const claimedLogs = parseEventLogs({ abi: [REWARDS_CLAIMED_EVENT] as const, logs: receipt.logs });
       if (claimedLogs.length > 0) {
-        await Promise.all(claimedLogs.map((log) =>
-          fetch("/api/claim-history", {
+        const UINT256_MAX = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        await Promise.all(claimedLogs.map((log) => {
+          const normalizedStakeId = log.args.stakeId >= UINT256_MAX ? -1 : Number(log.args.stakeId);
+          return fetch("/api/claim-history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ wallet: addr, stakeId: Number(log.args.stakeId), amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
-          })
-        ));
+            body: JSON.stringify({ wallet: addr, stakeId: normalizedStakeId, amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
+          });
+        }));
         fetchClaimHistory();
       }
     } catch (e) {

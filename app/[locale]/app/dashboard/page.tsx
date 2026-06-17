@@ -112,6 +112,7 @@ export default function DashboardPage() {
   });
 
   const [pendingDisplay, setPendingDisplay] = useState<string>("0.0000");
+  const [refTotal, setRefTotal] = useState<number | null>(null);
 
   const positions: StakePosition[] = (rawPositions as StakePosition[] | undefined) ?? [];
   const activePositions = positions.filter((p) => p.active);
@@ -121,6 +122,17 @@ export default function DashboardPage() {
   const azrWallet = azrWalBal ? parseFloat(formatUnits(azrWalBal as bigint, 18)) : 0;
   const usdtWallet = usdtWalBal ? parseFloat(formatUnits(usdtWalBal as bigint, 18)) : 0;
   const walletLoading = (azrLoading || usdtLoading) && !!addr;
+
+  useEffect(() => {
+    if (!addr) return;
+    fetch(`/api/referrals?wallet=${addr}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const t = d.totals;
+        if (t) setRefTotal((t.l1 ?? 0) + (t.l2 ?? 0) + (t.l3 ?? 0));
+      })
+      .catch(() => {});
+  }, [addr]);
 
   useEffect(() => {
     if (!hasStake) return;
@@ -154,7 +166,7 @@ export default function DashboardPage() {
               <KpiCard label={t("totalStaked")} value={staked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" sub={hasStake ? `${activePositions.length} active position${activePositions.length !== 1 ? "s" : ""}` : "No active stake"} glow />
               <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
               <KpiCard label={t("portfolio")} value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="AZR" />
-              <KpiCard label={t("referralEarnings")} value="—" unit="AZR" sub="See Referrals page" />
+              <KpiCard label={t("referralEarnings")} value={refTotal !== null ? refTotal.toFixed(4) : "—"} unit="AZR" sub="See Referrals page" />
               <WalletCard azr={azrWallet} usdt={usdtWallet} loading={walletLoading} />
             </>
           )}
