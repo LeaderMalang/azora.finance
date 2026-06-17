@@ -10,6 +10,30 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 
+async function getLogsChunked(
+  client: ReturnType<typeof usePublicClient>,
+  params: { address: `0x${string}`; event: unknown; args: unknown; fromBlock: bigint; toBlock: "latest" | bigint },
+  chunkSize = 2000
+) {
+  const c = client!;
+  const latest = await c.getBlockNumber();
+  const from = params.fromBlock;
+  const to = params.toBlock === "latest" ? latest : (params.toBlock as bigint);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  let start = from;
+  while (start <= to) {
+    const end = start + BigInt(chunkSize) - BigInt(1) <= to
+      ? start + BigInt(chunkSize) - BigInt(1)
+      : to;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chunk = await c.getLogs({ ...(params as any), fromBlock: start, toBlock: end });
+    all.push(...chunk);
+    start = end + BigInt(1);
+  }
+  return all;
+}
+
 type StakePosition = {
   id: bigint;
   amount: bigint;
@@ -75,7 +99,7 @@ export default function StakePage() {
   const fetchClaimHistory = useCallback(async () => {
     if (!addr || !publicClient) return;
     try {
-      const logs = await publicClient.getLogs({
+      const logs = await getLogsChunked(publicClient, {
         address: CONTRACTS[chainId].staking,
         event: REWARDS_CLAIMED_EVENT,
         args: { user: addr },
@@ -111,7 +135,8 @@ export default function StakePage() {
     try {
       const approveHash = await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
       await publicClient!.waitForTransactionReceipt({ hash: approveHash });
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
+      const stakeHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
+      await publicClient!.waitForTransactionReceipt({ hash: stakeHash });
       toast(`Staked ${amount} AZR · locked ${lockDays} days`);
       setAmount("");
       refetchBalance();
@@ -165,7 +190,8 @@ export default function StakePage() {
     }
     setTxPending(true);
     try {
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
+      const unstakeHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
+      await publicClient!.waitForTransactionReceipt({ hash: unstakeHash });
       toast("Unstaked · principal + rewards returned");
       refetchBalance();
       setTimeout(() => refetchPositions(), 3000);

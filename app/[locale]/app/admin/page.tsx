@@ -166,7 +166,8 @@ export default function AdminPage() {
         if (!name.includes(q) && !addr2.includes(q)) return false;
       }
       return true;
-    });
+    })
+    .sort(({ req: a }, { req: b }) => Number(b.id - a.id));
 
   const exec = async (fn: () => Promise<unknown>, successMsg: string, refetch?: () => void) => {
     setTxPending(true);
@@ -452,9 +453,9 @@ export default function AdminPage() {
           </AdminCard>
 
           {/* Seed referral relationship in DB */}
-          <AdminCard title="Seed Referral Link (DB)">
+          <AdminCard title="Link / Change User Upline">
             <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-              Manually link a referred user to their referrer in the database. Use this when a user registered without the referral link but you know they belong to a referrer&apos;s network. Both users must have visited the app at least once.
+              Links a user to their referrer, or reassigns an existing upline. Works for both new links and corrections — if the user already has an upline it will be replaced. Both users must have visited the app at least once.
             </p>
             <div className="space-y-3">
               <div>

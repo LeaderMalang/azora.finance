@@ -42,9 +42,9 @@ export default function WithdrawalsPage() {
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: feeBps } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalFeeBps", query: { enabled: true } });
-  const { data: azrBal, isLoading: balLoading } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
-  const { data: usdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
-  const { data: reqCount, isLoading: reqLoading, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true } });
+  const { data: azrBal, isLoading: balLoading, refetch: refetchAzrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: usdtBal, refetch: refetchUsdtBal } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const { data: reqCount, isLoading: reqLoading, refetch: refetchReqCount } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "withdrawalRequestCount", query: { enabled: true, refetchInterval: 30000 } });
 
   const reqCountNum = reqCount ? Number(reqCount as bigint) : 0;
   const { data: allRequestsRaw, refetch: refetchRequests } = useReadContracts({
@@ -88,9 +88,11 @@ export default function WithdrawalsPage() {
     try {
       const approveHash = await writeContractAsync({ address: tokenAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
       await publicClient!.waitForTransactionReceipt({ hash: approveHash });
-      await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "requestWithdrawal", args: [parsed, asset] });
+      const wdHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "requestWithdrawal", args: [parsed, asset] });
+      await publicClient!.waitForTransactionReceipt({ hash: wdHash });
       toast(`Withdrawal of ${amount} ${assetLabel} requested`);
       setAmount("");
+      if (asset === 0) { refetchAzrBal(); } else { refetchUsdtBal(); }
       setTimeout(() => { refetchReqCount(); refetchRequests(); }, 3000);
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");

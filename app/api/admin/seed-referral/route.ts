@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const referred = await prisma.user.findFirst({
-      where: { walletAddress: walletAddress.toLowerCase() },
+      where: { walletAddress: { equals: walletAddress, mode: "insensitive" } },
     });
     if (!referred) {
       return NextResponse.json({ error: "Referred user not found in DB — they must visit the app first" }, { status: 404 });

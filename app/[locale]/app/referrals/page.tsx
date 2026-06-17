@@ -10,6 +10,30 @@ import { formatUnits } from "viem";
 import { CONTRACTS, STAKING_ABI, REFERRAL_COMMISSION_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 
+async function getLogsChunked(
+  client: ReturnType<typeof usePublicClient>,
+  params: { address: `0x${string}`; event: unknown; args: unknown; fromBlock: bigint; toBlock: "latest" | bigint },
+  chunkSize = 2000
+) {
+  const c = client!;
+  const latest = await c.getBlockNumber();
+  const from = params.fromBlock;
+  const to = params.toBlock === "latest" ? latest : (params.toBlock as bigint);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  let start = from;
+  while (start <= to) {
+    const end = start + BigInt(chunkSize) - BigInt(1) <= to
+      ? start + BigInt(chunkSize) - BigInt(1)
+      : to;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chunk = await c.getLogs({ ...(params as any), fromBlock: start, toBlock: end });
+    all.push(...chunk);
+    start = end + BigInt(1);
+  }
+  return all;
+}
+
 type DisplayEntry = {
   level: number;
   amountFormatted: string;
@@ -123,7 +147,7 @@ export default function ReferralsPage() {
     if (!addr || !publicClient) return;
     setSyncing(true);
     try {
-      const logs = await publicClient.getLogs({
+      const logs = await getLogsChunked(publicClient, {
         address: CONTRACTS[chainId].staking,
         event: REFERRAL_COMMISSION_EVENT,
         args: { recipient: addr },
