@@ -58,3 +58,14 @@ model ReferralEarning {
   txHash     String?
   createdAt  DateTime @default(now())
 }
+
+model ClaimHistory {
+  id        Int      @id @default(autoincrement())
+  wallet    String
+  stakeId   Int
+  amount    String
+  txHash    String   @unique
+  claimedAt DateTime @default(now())
+
+  @@index([wallet])
+}

@@ -3,36 +3,13 @@
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
-import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
+import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, parseEventLogs } from "viem";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 
-async function getLogsChunked(
-  client: ReturnType<typeof usePublicClient>,
-  params: { address: `0x${string}`; event: unknown; args: unknown; fromBlock: bigint; toBlock: "latest" | bigint },
-  chunkSize = 2000
-) {
-  const c = client!;
-  const latest = await c.getBlockNumber();
-  const from = params.fromBlock;
-  const to = params.toBlock === "latest" ? latest : (params.toBlock as bigint);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const all: any[] = [];
-  let start = from;
-  while (start <= to) {
-    const end = start + BigInt(chunkSize) - BigInt(1) <= to
-      ? start + BigInt(chunkSize) - BigInt(1)
-      : to;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunk = await c.getLogs({ ...(params as any), fromBlock: start, toBlock: end });
-    all.push(...chunk);
-    start = end + BigInt(1);
-  }
-  return all;
-}
 
 type StakePosition = {
   id: bigint;
@@ -95,31 +72,18 @@ export default function StakePage() {
   const activePositions = positions.filter((p) => p.active);
   const estDaily = amount ? (parseFloat(amount) * 0.007).toFixed(2) : "0.00";
 
-  // Fetch claim history from events — use deploy block to avoid RPC range-limit errors
   const fetchClaimHistory = useCallback(async () => {
-    if (!addr || !publicClient) return;
+    if (!addr) return;
     try {
-      const logs = await getLogsChunked(publicClient, {
-        address: CONTRACTS[chainId].staking,
-        event: REWARDS_CLAIMED_EVENT,
-        args: { user: addr },
-        fromBlock: STAKING_DEPLOY_BLOCK,
-        toBlock: "latest",
-      });
-      const history = await Promise.all(
-        logs.map(async (log) => {
-          const block = await publicClient.getBlock({ blockNumber: log.blockNumber! });
-          return {
-            date: new Date(Number(block.timestamp) * 1000).toLocaleString(),
-            amount: parseFloat(formatUnits((log.args as { amount: bigint }).amount, 18)).toFixed(4),
-          };
-        })
-      );
-      setClaimHistory(history.reverse());
-    } catch {
-      // silently ignore
-    }
-  }, [addr, publicClient, chainId]);
+      const res = await fetch(`/api/claim-history?wallet=${addr}`);
+      if (!res.ok) return;
+      const rows = await res.json();
+      setClaimHistory(rows.map((r: { claimedAt: string; amount: string }) => ({
+        date: new Date(r.claimedAt).toLocaleString(),
+        amount: parseFloat(formatUnits(BigInt(r.amount), 18)).toFixed(4),
+      })));
+    } catch { /* empty state is acceptable */ }
+  }, [addr]);
 
   useEffect(() => { fetchClaimHistory(); }, [fetchClaimHistory]);
 
@@ -153,11 +117,21 @@ export default function StakePage() {
     setTxPending(true);
     try {
       const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimRewards", args: [stakeId] });
+      const receipt = await publicClient!.waitForTransactionReceipt({ hash });
       toast("Rewards claimed to balance");
-      await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
       refetchBalance();
-      setTimeout(() => fetchClaimHistory(), 3000);
+      const claimedLogs = parseEventLogs({ abi: [REWARDS_CLAIMED_EVENT] as const, logs: receipt.logs });
+      if (claimedLogs.length > 0) {
+        await Promise.all(claimedLogs.map((log) =>
+          fetch("/api/claim-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wallet: addr, stakeId: Number(log.args.stakeId), amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
+          })
+        ));
+        fetchClaimHistory();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     } finally {
@@ -170,11 +144,21 @@ export default function StakePage() {
     setTxPending(true);
     try {
       const hash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "claimAllRewards", args: [] });
+      const receipt = await publicClient!.waitForTransactionReceipt({ hash });
       toast("All rewards claimed");
-      await publicClient!.waitForTransactionReceipt({ hash });
       refetchPositions();
       refetchBalance();
-      setTimeout(() => fetchClaimHistory(), 3000);
+      const claimedLogs = parseEventLogs({ abi: [REWARDS_CLAIMED_EVENT] as const, logs: receipt.logs });
+      if (claimedLogs.length > 0) {
+        await Promise.all(claimedLogs.map((log) =>
+          fetch("/api/claim-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wallet: addr, stakeId: Number(log.args.stakeId), amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
+          })
+        ));
+        fetchClaimHistory();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Claim failed", "error");
     } finally {
@@ -191,10 +175,21 @@ export default function StakePage() {
     setTxPending(true);
     try {
       const unstakeHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
-      await publicClient!.waitForTransactionReceipt({ hash: unstakeHash });
+      const receipt = await publicClient!.waitForTransactionReceipt({ hash: unstakeHash });
       toast("Unstaked · principal + rewards returned");
       refetchBalance();
       setTimeout(() => refetchPositions(), 3000);
+      const claimedLogs = parseEventLogs({ abi: [REWARDS_CLAIMED_EVENT] as const, logs: receipt.logs });
+      if (claimedLogs.length > 0) {
+        await Promise.all(claimedLogs.map((log) =>
+          fetch("/api/claim-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wallet: addr, stakeId: Number(log.args.stakeId), amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
+          })
+        ));
+        fetchClaimHistory();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Unstake failed", "error");
     } finally {
