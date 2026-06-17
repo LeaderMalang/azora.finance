@@ -5,24 +5,36 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const { walletAddress, referrerUsername } = await req.json();
+    const { walletAddress, referrerUsername, referredUsername } = await req.json();
     if (!walletAddress || !referrerUsername) {
       return NextResponse.json({ error: "Missing walletAddress or referrerUsername" }, { status: 400 });
     }
 
-    const clean = referrerUsername.replace(/\.azr$/, "").toLowerCase();
+    const cleanReferrer = referrerUsername.replace(/\.azr$/, "").toLowerCase();
     const referrer = await prisma.user.findFirst({
-      where: { username: { equals: clean, mode: "insensitive" } },
+      where: { username: { equals: cleanReferrer, mode: "insensitive" } },
     });
     if (!referrer) {
-      return NextResponse.json({ error: `Referrer "${clean}" not found in DB — they must visit the app first` }, { status: 404 });
+      return NextResponse.json({ error: `Referrer "${cleanReferrer}" not found in DB — they must visit the app first` }, { status: 404 });
     }
 
-    const referred = await prisma.user.findFirst({
+    let referred = await prisma.user.findFirst({
       where: { walletAddress: { equals: walletAddress, mode: "insensitive" } },
     });
+
     if (!referred) {
-      return NextResponse.json({ error: "Referred user not found in DB — they must visit the app first" }, { status: 404 });
+      if (!referredUsername) {
+        return NextResponse.json(
+          { error: "User not found in DB. Enter their username in the third field to create their profile." },
+          { status: 404 }
+        );
+      }
+      const cleanReferred = referredUsername.replace(/\.azr$/, "").toLowerCase();
+      referred = await prisma.user.upsert({
+        where: { username: cleanReferred },
+        create: { username: cleanReferred, walletAddress },
+        update: { walletAddress },
+      });
     }
 
     const updated = await prisma.user.update({

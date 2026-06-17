@@ -113,6 +113,7 @@ export default function AdminPage() {
   const [withdrawId, setWithdrawId] = useState("");
   const [seedWallet, setSeedWallet] = useState("");
   const [seedReferrer, setSeedReferrer] = useState("");
+  const [seedUsername, setSeedUsername] = useState("");
   const [seedLoading, setSeedLoading] = useState(false);
 
   // Live staked balance for debit target
@@ -455,12 +456,16 @@ export default function AdminPage() {
           {/* Seed referral relationship in DB */}
           <AdminCard title="Link / Change User Upline">
             <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-              Links a user to their referrer, or reassigns an existing upline. Works for both new links and corrections — if the user already has an upline it will be replaced. Both users must have visited the app at least once.
+              Links a user to their referrer, or reassigns an existing upline. If the user has never visited the app, fill in their username too — the profile will be created automatically.
             </p>
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Referred User Wallet Address</label>
                 <input className="az-input" placeholder="0x..." value={seedWallet} onChange={(e) => setSeedWallet(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Referred User Username (only needed if not yet in DB)</label>
+                <input className="az-input" placeholder="leadermalang2" value={seedUsername} onChange={(e) => setSeedUsername(e.target.value)} />
               </div>
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Referrer Username</label>
@@ -475,11 +480,11 @@ export default function AdminPage() {
                     const res = await fetch("/api/admin/seed-referral", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ walletAddress: seedWallet, referrerUsername: seedReferrer }),
+                      body: JSON.stringify({ walletAddress: seedWallet, referrerUsername: seedReferrer, referredUsername: seedUsername || undefined }),
                     });
                     const data = await res.json();
                     if (!res.ok) { toast(data.error ?? "Failed", "error"); }
-                    else { toast(`Linked ${data.updated?.username} → ${seedReferrer}`); setSeedWallet(""); setSeedReferrer(""); }
+                    else { toast(`Linked ${data.updated?.username} → ${seedReferrer}`); setSeedWallet(""); setSeedReferrer(""); setSeedUsername(""); }
                   } catch { toast("Network error", "error"); }
                   finally { setSeedLoading(false); }
                 }}
