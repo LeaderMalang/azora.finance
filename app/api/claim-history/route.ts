@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
     await prisma.claimHistory.upsert({
-      where: { txHash },
+      where: { txHash_stakeId: { txHash, stakeId } },
       create: { wallet, stakeId, amount, txHash },
       update: {},
     });

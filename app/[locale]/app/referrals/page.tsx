@@ -97,6 +97,7 @@ export default function ReferralsPage() {
   const [syncing, setSyncing] = useState(false);
   const [lvlFilter, setLvlFilter] = useState(-1);
   const [network, setNetwork] = useState<ReferralNetwork | null>(null);
+  const [dbUpline, setDbUpline] = useState("");
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
   const { data: userInfo } = useReadContract({
@@ -130,7 +131,8 @@ export default function ReferralsPage() {
     try {
       const res = await fetch(`/api/referrals?wallet=${addr}`);
       if (!res.ok) return;
-      const { earnings } = await res.json();
+      const data = await res.json();
+      const { earnings, uplineUsername } = data;
       setEntries(
         (earnings as { level: number; amount: string; fromUser: string; txHash: string | null }[]).map((e) => ({
           level: e.level,
@@ -140,6 +142,7 @@ export default function ReferralsPage() {
           source: "db" as const,
         }))
       );
+      if (uplineUsername) setDbUpline(uplineUsername);
     } catch { /* silently ignore */ }
   }, [addr]);
 
@@ -271,10 +274,10 @@ export default function ReferralsPage() {
           </div>
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
             <div className="text-xs az-mono mb-1" style={{ color: "var(--muted)" }}>Your Referrer (Upline)</div>
-            {!username ? (
+            {!username && !dbUpline ? (
               <Skeleton className="h-4 w-28" />
-            ) : upline ? (
-              <span className="az-mono text-sm font-semibold" style={{ color: "var(--teal)" }}>{upline}.azr</span>
+            ) : (upline || dbUpline) ? (
+              <span className="az-mono text-sm font-semibold" style={{ color: "var(--teal)" }}>{(upline || dbUpline)}.azr</span>
             ) : (
               <span className="text-sm" style={{ color: "var(--text-2)" }}>None — you are a direct member</span>
             )}

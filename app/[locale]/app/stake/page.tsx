@@ -3,7 +3,7 @@
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
-import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT } from "@/lib/contracts";
+import { CONTRACTS, ERC20_ABI, STAKING_ABI, REWARDS_CLAIMED_EVENT, REFERRAL_COMMISSION_EVENT } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, parseUnits, parseEventLogs } from "viem";
 import { useState, useEffect, useCallback } from "react";
@@ -100,11 +100,27 @@ export default function StakePage() {
       const approveHash = await writeContractAsync({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
       await publicClient!.waitForTransactionReceipt({ hash: approveHash });
       const stakeHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "stake", args: [parsed, autoReferrer] });
-      await publicClient!.waitForTransactionReceipt({ hash: stakeHash });
+      const stakeReceipt = await publicClient!.waitForTransactionReceipt({ hash: stakeHash });
       toast(`Staked ${amount} AZR · locked ${lockDays} days`);
       setAmount("");
       refetchBalance();
       setTimeout(() => refetchPositions(), 3000);
+      const commLogs = parseEventLogs({ abi: [REFERRAL_COMMISSION_EVENT] as const, logs: stakeReceipt.logs });
+      if (commLogs.length > 0) {
+        await Promise.all(commLogs.map((log) =>
+          fetch("/api/referrals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              wallet: log.args.recipient,
+              fromUser: addr,
+              level: Number(log.args.level),
+              amount: log.args.amount.toString(),
+              txHash: stakeReceipt.transactionHash,
+            }),
+          })
+        ));
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
     } finally {

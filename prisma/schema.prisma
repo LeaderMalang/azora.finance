@@ -64,8 +64,9 @@ model ClaimHistory {
   wallet    String
   stakeId   Int
   amount    String
-  txHash    String   @unique
+  txHash    String
   claimedAt DateTime @default(now())
 
+  @@unique([txHash, stakeId])
   @@index([wallet])
 }

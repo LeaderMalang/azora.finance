@@ -5,8 +5,11 @@ export async function GET(req: NextRequest) {
   const wallet = req.nextUrl.searchParams.get("wallet");
   if (!wallet) return NextResponse.json({ error: "Provide wallet" }, { status: 400 });
 
-  const user = await prisma.user.findFirst({ where: { walletAddress: wallet } });
-  if (!user) return NextResponse.json({ earnings: [], totals: { l1: 0, l2: 0, l3: 0 } });
+  const user = await prisma.user.findFirst({
+    where: { walletAddress: { equals: wallet, mode: "insensitive" } },
+    include: { referredByUser: true },
+  });
+  if (!user) return NextResponse.json({ earnings: [], totals: { l1: 0, l2: 0, l3: 0 }, uplineUsername: null });
 
   const earnings = await prisma.referralEarning.findMany({
     where: { userId: user.id },
@@ -22,12 +25,12 @@ export async function GET(req: NextRequest) {
     { l1: 0, l2: 0, l3: 0 }
   );
 
-  return NextResponse.json({ earnings, totals });
+  return NextResponse.json({ earnings, totals, uplineUsername: user.referredByUser?.username ?? null });
 }
 
 export async function POST(req: NextRequest) {
   const { wallet, fromUser, level, amount, txHash } = await req.json();
-  const user = await prisma.user.findFirst({ where: { walletAddress: wallet } });
+  const user = await prisma.user.findFirst({ where: { walletAddress: { equals: wallet, mode: "insensitive" } } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   if (txHash) {
