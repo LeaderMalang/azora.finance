@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTranslations } from "next-intl";
 import { useAccount, useReadContract, usePublicClient } from "wagmi";
@@ -83,6 +84,15 @@ export default function ReferralsPage() {
   });
   const username = (userInfo?.[1] as string) ?? "";
 
+  const { data: uplineData } = useReadContract({
+    address: CONTRACTS[chainId].staking,
+    abi: STAKING_ABI,
+    functionName: "referredBy",
+    args: username ? [username] : undefined,
+    query: { enabled: !!username },
+  });
+  const upline = (uplineData as string) ?? "";
+
   const { data: l1Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL1", query: { enabled: true } });
   const { data: l2Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL2", query: { enabled: true } });
   const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
@@ -152,6 +162,41 @@ export default function ReferralsPage() {
         }
         return newEntries.length > 0 ? [...newEntries, ...prev] : prev;
       });
+
+      // Backfill DB for L1 commission senders so the network card shows them without needing them to reconnect
+      if (username) {
+        const l1FromsArr = Array.from(new Set(
+          logs
+            .filter((l) => (l.args as { level: number }).level === 1)
+            .map((l) => (l.args as { from: `0x${string}` }).from.toLowerCase())
+        ));
+        let backfilled = false;
+        for (const fromAddr of l1FromsArr) {
+          try {
+            const result = await publicClient!.readContract({
+              address: CONTRACTS[chainId].staking,
+              abi: STAKING_ABI,
+              functionName: "usersByAddress",
+              args: [fromAddr as `0x${string}`],
+            });
+            const fromUsername = (result as unknown as [string, string])[1];
+            if (fromUsername) {
+              await fetch("/api/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: fromUsername, walletAddress: fromAddr, referralUsername: username }),
+              });
+              backfilled = true;
+            }
+          } catch { /* ignore */ }
+        }
+        if (backfilled && l1FromsArr.length > 0) {
+          fetch(`/api/referrals/network?wallet=${addr}`)
+            .then((r) => r.json())
+            .then(setNetwork)
+            .catch(() => {});
+        }
+      }
     } catch { /* silently ignore RPC errors */ }
     finally { setSyncing(false); }
   }, [addr, publicClient, chainId]);
@@ -200,6 +245,16 @@ export default function ReferralsPage() {
               {copied ? t("copied") : t("copy")}
             </button>
           </div>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
+            <div className="text-xs az-mono mb-1" style={{ color: "var(--muted)" }}>Your Referrer (Upline)</div>
+            {!username ? (
+              <Skeleton className="h-4 w-28" />
+            ) : upline ? (
+              <span className="az-mono text-sm font-semibold" style={{ color: "var(--teal)" }}>{upline}.azr</span>
+            ) : (
+              <span className="text-sm" style={{ color: "var(--text-2)" }}>None — you are a direct member</span>
+            )}
+          </div>
         </div>
 
         {/* Level earnings summary */}
@@ -247,7 +302,7 @@ export default function ReferralsPage() {
 
           {!network || networkTotal === 0 ? (
             <p className="text-sm text-center py-3" style={{ color: "var(--text-2)" }}>
-              No one has joined yet. Share your link to build your network.
+              No members synced yet. Network counts update as your referrals visit the app.
             </p>
           ) : (
             <>

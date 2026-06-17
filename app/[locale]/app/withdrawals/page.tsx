@@ -65,11 +65,13 @@ export default function WithdrawalsPage() {
     })
     .filter((r): r is WRequest => !!r && r.requester?.toLowerCase() === addr?.toLowerCase());
 
-  const filteredRequests = myRequests.filter((r) => {
-    if (statusFilter !== -1 && r.status !== statusFilter) return false;
-    if (assetFilter !== -1 && r.assetType !== assetFilter) return false;
-    return true;
-  });
+  const filteredRequests = myRequests
+    .filter((r) => {
+      if (statusFilter !== -1 && r.status !== statusFilter) return false;
+      if (assetFilter !== -1 && r.assetType !== assetFilter) return false;
+      return true;
+    })
+    .sort((a, b) => Number(b.id - a.id));
 
   const fee = feeBps ? Number(feeBps as bigint) / 10000 : 0.02;
   const feeAmt = amount ? parseFloat(amount) * fee : 0;
@@ -185,12 +187,13 @@ export default function WithdrawalsPage() {
                     <th className="text-left pb-3 font-normal">Amount</th>
                     <th className="text-left pb-3 font-normal">Status</th>
                     <th className="text-left pb-3 font-normal">Date</th>
+                    <th className="text-left pb-3 font-normal">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[0, 1, 2].map((i) => (
                     <tr key={i}>
-                      {[0, 1, 2, 3, 4].map((j) => (
+                      {[0, 1, 2, 3, 4, 5].map((j) => (
                         <td key={j} className="py-3 pr-4"><Skeleton className="h-3 w-full" /></td>
                       ))}
                     </tr>
@@ -212,6 +215,7 @@ export default function WithdrawalsPage() {
                     <th className="text-left pb-3 font-normal">Amount</th>
                     <th className="text-left pb-3 font-normal">Status</th>
                     <th className="text-left pb-3 font-normal">Date</th>
+                    <th className="text-left pb-3 font-normal">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
@@ -234,6 +238,17 @@ export default function WithdrawalsPage() {
                       </td>
                       <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
                         {new Date(Number(req.createdAt) * 1000).toLocaleDateString()}
+                      </td>
+                      <td className="py-3">
+                        {req.status === 0 && (
+                          <button
+                            className="text-xs az-mono px-2 py-1 rounded-ctl"
+                            style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.06)" }}
+                            onClick={() => toast("To cancel a pending withdrawal, please contact support.", "error")}
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

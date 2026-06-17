@@ -61,6 +61,7 @@ export default function StakePage() {
     query: { enabled: !!selfUsername },
   });
   const autoReferrer = (referredByData as string) ?? "";
+  const referrerLoading = !!selfUsername && referredByData === undefined;
 
   const azrBalance = azrBal ? parseFloat(formatUnits(azrBal as bigint, 18)) : 0;
   const minStakeAmt = minStake ? parseFloat(formatUnits(minStake as bigint, 18)) : 50;
@@ -100,6 +101,7 @@ export default function StakePage() {
 
   const doStake = async () => {
     if (!addr || !amount) return;
+    if (referrerLoading) { toast("Loading referral info — please wait a moment", "error"); return; }
     if (parseFloat(amount) > azrBalance) {
       toast("Insufficient AZR balance", "error");
       return;
@@ -214,7 +216,7 @@ export default function StakePage() {
                 <Spinner size="sm" /> Waiting for blockchain confirmation…
               </div>
             )}
-            <button className="az-btn-primary w-full" onClick={doStake} disabled={txPending || !amount || parseFloat(amount || "0") > azrBalance}>
+            <button className="az-btn-primary w-full" onClick={doStake} disabled={txPending || !amount || referrerLoading || parseFloat(amount || "0") > azrBalance}>
               {txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : t("stakeBtn")}
             </button>
           </div>

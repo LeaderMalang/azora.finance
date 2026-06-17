@@ -111,6 +111,9 @@ export default function AdminPage() {
   const [creditAmt, setCreditAmt] = useState("");
   const [creditAddr, setCreditAddr] = useState("");
   const [withdrawId, setWithdrawId] = useState("");
+  const [seedWallet, setSeedWallet] = useState("");
+  const [seedReferrer, setSeedReferrer] = useState("");
+  const [seedLoading, setSeedLoading] = useState(false);
 
   // Live staked balance for debit target
   const { data: targetStaked } = useReadContract({
@@ -445,6 +448,41 @@ export default function AdminPage() {
                   () => { refetchAllRequests(); refetchReqCount(); },
                 )}
               >✗ Reject</button>
+            </div>
+          </AdminCard>
+
+          {/* Seed referral relationship in DB */}
+          <AdminCard title="Seed Referral Link (DB)">
+            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+              Manually link a referred user to their referrer in the database. Use this when a user registered without the referral link but you know they belong to a referrer&apos;s network. Both users must have visited the app at least once.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Referred User Wallet Address</label>
+                <input className="az-input" placeholder="0x..." value={seedWallet} onChange={(e) => setSeedWallet(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Referrer Username</label>
+                <input className="az-input" placeholder="leadermalang" value={seedReferrer} onChange={(e) => setSeedReferrer(e.target.value)} />
+              </div>
+              <button
+                className="az-btn-primary w-full"
+                disabled={seedLoading || !seedWallet || !seedReferrer}
+                onClick={async () => {
+                  setSeedLoading(true);
+                  try {
+                    const res = await fetch("/api/admin/seed-referral", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ walletAddress: seedWallet, referrerUsername: seedReferrer }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { toast(data.error ?? "Failed", "error"); }
+                    else { toast(`Linked ${data.updated?.username} → ${seedReferrer}`); setSeedWallet(""); setSeedReferrer(""); }
+                  } catch { toast("Network error", "error"); }
+                  finally { setSeedLoading(false); }
+                }}
+              >{seedLoading ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Linking…</span> : "Link Referral"}</button>
             </div>
           </AdminCard>
 

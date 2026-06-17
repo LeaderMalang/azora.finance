@@ -24,6 +24,13 @@ function KpiCard({ label, value, unit, sub, glow }: { label: string; value: stri
   );
 }
 
+function fmtBal(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " B";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + " M";
+  if (n >= 100_000) return (n / 1_000).toFixed(1) + " K";
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function WalletCard({ azr, usdt, loading }: { azr: number; usdt: number; loading: boolean }) {
   return (
     <div className="az-card">
@@ -41,7 +48,7 @@ function WalletCard({ azr, usdt, loading }: { azr: number; usdt: number; loading
               <span className="az-mono text-xs font-semibold">AZR</span>
             </span>
             <span className="font-bold az-mono text-sm" style={{ color: "var(--teal)" }}>
-              {azr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {fmtBal(azr)}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -50,7 +57,7 @@ function WalletCard({ azr, usdt, loading }: { azr: number; usdt: number; loading
               <span className="az-mono text-xs font-semibold">USDT</span>
             </span>
             <span className="font-bold az-mono text-sm">
-              {usdt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {fmtBal(usdt)}
             </span>
           </div>
         </div>
