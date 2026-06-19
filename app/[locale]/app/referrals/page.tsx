@@ -136,7 +136,7 @@ export default function ReferralsPage() {
       setEntries(
         (earnings as { level: number; amount: string; fromUser: string; txHash: string | null }[]).map((e) => ({
           level: e.level,
-          amountFormatted: parseFloat(e.amount).toFixed(4),
+          amountFormatted: (parseFloat(e.amount) / 1e18).toFixed(4),
           from: e.fromUser,
           txHash: e.txHash ?? null,
           source: "db" as const,
@@ -273,13 +273,29 @@ export default function ReferralsPage() {
             </button>
           </div>
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
-            <div className="text-xs az-mono mb-1" style={{ color: "var(--muted)" }}>Your Referrer (Upline)</div>
+            <div className="text-xs az-mono mb-1" style={{ color: "var(--muted)" }}>Your Referrer / Upline</div>
             {!username && !dbUpline ? (
               <Skeleton className="h-4 w-28" />
             ) : (upline || dbUpline) ? (
               <span className="az-mono text-sm font-semibold" style={{ color: "var(--teal)" }}>{(upline || dbUpline)}.azr</span>
             ) : (
               <span className="text-sm" style={{ color: "var(--text-2)" }}>None — you are a direct member</span>
+            )}
+          </div>
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--line)" }}>
+            <div className="text-xs az-mono mb-2" style={{ color: "var(--muted)" }}>Your Referred / Downlines (L1)</div>
+            {!network ? (
+              <Skeleton className="h-4 w-40" />
+            ) : network.l1?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {(network.l1 as { username: string; walletAddress: string }[]).map((u) => (
+                  <span key={u.walletAddress} className="az-mono text-xs px-2 py-0.5 rounded" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
+                    {u.username}.azr
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm" style={{ color: "var(--text-2)" }}>No direct referrals yet</span>
             )}
           </div>
         </div>

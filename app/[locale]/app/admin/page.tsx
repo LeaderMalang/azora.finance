@@ -115,6 +115,16 @@ export default function AdminPage() {
   const [seedReferrer, setSeedReferrer] = useState("");
   const [seedUsername, setSeedUsername] = useState("");
   const [seedLoading, setSeedLoading] = useState(false);
+  // Virtual credit/debit
+  const [vcWallet, setVcWallet] = useState("");
+  const [vcDelta, setVcDelta] = useState("");
+  const [vcBalance, setVcBalance] = useState<number | null>(null);
+  const [vcLoading, setVcLoading] = useState(false);
+  // User lookup
+  const [userQuery, setUserQuery] = useState("");
+  const [userQueryLoading, setUserQueryLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [userResult, setUserResult] = useState<any>(null);
 
   // Live staked balance for debit target
   const { data: targetStaked } = useReadContract({
@@ -190,6 +200,100 @@ export default function AdminPage() {
     <>
       <AppTopbar title="Admin Panel" sub="Owner-only contract controls · handle with care" />
       <div className="p-4 md:p-8 max-w-app space-y-6">
+
+        {/* User Data Lookup */}
+        <AdminCard title="User Data Lookup">
+          <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>Search by wallet address or username to view all data for a user.</p>
+          <div className="flex gap-2 mb-4">
+            <input
+              className="az-input flex-1"
+              placeholder="0x... or username"
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && userQuery) { setUserQueryLoading(true); fetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); } }}
+            />
+            <button
+              className="az-btn-primary px-4"
+              disabled={userQueryLoading || !userQuery}
+              onClick={() => { setUserQueryLoading(true); fetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); }}
+            >{userQueryLoading ? <Spinner size="sm" /> : "Search"}</button>
+          </div>
+          {userResult?.error && <p className="text-sm" style={{ color: "#ef4444" }}>{userResult.error}</p>}
+          {userResult?.user && (() => {
+            const u = userResult.user;
+            const sectionHead = (label: string) => (
+              <div className="text-[11px] az-mono uppercase tracking-wider mt-4 mb-2 pb-1" style={{ color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>{label}</div>
+            );
+            const row = (label: string, value: React.ReactNode) => (
+              <div className="flex justify-between text-xs py-1">
+                <span style={{ color: "var(--text-2)" }}>{label}</span>
+                <span className="az-mono font-semibold text-right ml-4" style={{ maxWidth: "60%" }}>{value}</span>
+              </div>
+            );
+            return (
+              <div className="rounded-ctl p-4" style={{ background: "var(--bg-2)" }}>
+                {sectionHead("Identity")}
+                {row("User #", `#${u.seqId}`)}
+                {row("Username", `${u.username}.azr`)}
+                {row("Wallet", <span className="break-all">{u.walletAddress}</span>)}
+                {row("Joined", new Date(u.createdAt).toLocaleString())}
+                {row("Virtual Balance", <span style={{ color: (u.userCredit?.balance ?? 0) < 0 ? "#ef4444" : "var(--teal)" }}>{(u.userCredit?.balance ?? 0).toFixed(4)} AZR</span>)}
+
+                {sectionHead("Referral Network")}
+                {row("Upline (Referrer)", u.referredByUser ? `${u.referredByUser.username}.azr (#${u.referredByUser.seqId})` : "None")}
+                {row("Downlines (L1)", u.referrals?.length ? u.referrals.map((r: {username: string; seqId: number}) => `${r.username}.azr (#${r.seqId})`).join(", ") : "None")}
+
+                {sectionHead(`Stakes (${u.stakes?.length ?? 0} total · ${userResult.totalStaked?.toFixed(4)} AZR active)`)}
+                {u.stakes?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs mt-1">
+                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Amount</th><th className="text-left pb-1 font-normal">Start</th><th className="text-left pb-1 font-normal">Status</th></tr></thead>
+                      <tbody>{u.stakes.map((s: {id: string; amount: string; stakeStartTime: string; isActive: boolean}) => (
+                        <tr key={s.id}><td className="py-0.5 az-mono">{(parseFloat(s.amount) / 1e18).toFixed(4)} AZR</td><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(s.stakeStartTime).toLocaleDateString()}</td><td className="py-0.5"><span style={{ color: s.isActive ? "var(--teal)" : "var(--muted)" }}>{s.isActive ? "Active" : "Ended"}</span></td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No stakes</p>}
+
+                {sectionHead(`Claim History (${userResult.claimHistory?.length ?? 0})`)}
+                {userResult.claimHistory?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs mt-1">
+                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Date</th><th className="text-right pb-1 font-normal">Amount</th></tr></thead>
+                      <tbody>{userResult.claimHistory.map((c: {id: number; amount: string; claimedAt: string}) => (
+                        <tr key={c.id}><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(c.claimedAt).toLocaleString()}</td><td className="py-0.5 az-mono text-right" style={{ color: "var(--teal)" }}>+{(parseFloat(c.amount) / 1e18).toFixed(4)} AZR</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No claims</p>}
+
+                {sectionHead(`Withdrawals (${u.withdrawals?.length ?? 0})`)}
+                {u.withdrawals?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs mt-1">
+                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Date</th><th className="text-left pb-1 font-normal">Asset</th><th className="text-right pb-1 font-normal">Amount</th><th className="text-left pb-1 font-normal pl-3">Status</th></tr></thead>
+                      <tbody>{u.withdrawals.map((w: {id: string; amount: string; assetType: number; status: number; createdAt: string}) => (
+                        <tr key={w.id}><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(w.createdAt).toLocaleDateString()}</td><td className="py-0.5 az-mono">{w.assetType === 0 ? "AZR" : "USDT"}</td><td className="py-0.5 az-mono text-right">{(parseFloat(w.amount) / 1e18).toFixed(4)}</td><td className="py-0.5 pl-3" style={{ color: w.status === 0 ? "var(--warn)" : w.status === 1 ? "var(--teal)" : "#ef4444" }}>{["Pending","Approved","Rejected"][w.status]}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No withdrawals</p>}
+
+                {sectionHead(`Referral Commissions (${u.referralEarnings?.length ?? 0} · ${userResult.totalCommissions?.toFixed(4)} AZR total)`)}
+                {u.referralEarnings?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs mt-1">
+                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Date</th><th className="text-left pb-1 font-normal">Level</th><th className="text-left pb-1 font-normal">From</th><th className="text-right pb-1 font-normal">Amount</th></tr></thead>
+                      <tbody>{u.referralEarnings.map((e: {id: string; level: number; fromUser: string; amount: string; createdAt: string}) => (
+                        <tr key={e.id}><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(e.createdAt).toLocaleDateString()}</td><td className="py-0.5 az-mono">L{e.level}</td><td className="py-0.5 az-mono">{e.fromUser.slice(0,6)}…{e.fromUser.slice(-4)}</td><td className="py-0.5 az-mono text-right" style={{ color: "var(--teal)" }}>+{(parseFloat(e.amount) / 1e18).toFixed(4)}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No commissions</p>}
+              </div>
+            );
+          })()}
+        </AdminCard>
 
         {/* Stats overview */}
         <div className="az-card-glow">
@@ -417,6 +521,64 @@ export default function AdminPage() {
                   `Sent ${creditAmt} AZR to ${creditAddr.slice(0, 8)}…`,
                 )}
               >{txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Credit Wallet"}</button>
+            </div>
+          </AdminCard>
+
+          {/* Virtual account credit / debit */}
+          <AdminCard title="Virtual Account Balance">
+            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+              Adjust a user&apos;s virtual account balance (DB only, no on-chain transaction). Enter a positive amount to credit, negative to debit. Balance can go negative and is corrected by future claims or deposits.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Wallet Address</label>
+                <div className="flex gap-2">
+                  <input
+                    className="az-input flex-1"
+                    placeholder="0x..."
+                    value={vcWallet}
+                    onChange={(e) => { setVcWallet(e.target.value); setVcBalance(null); }}
+                  />
+                  <button
+                    className="px-3 rounded-ctl text-xs font-semibold"
+                    style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
+                    disabled={!isAddress(vcWallet)}
+                    onClick={async () => {
+                      const res = await fetch(`/api/admin/user-credit?wallet=${vcWallet}`);
+                      const d = await res.json();
+                      setVcBalance(d.balance ?? 0);
+                    }}
+                  >Check</button>
+                </div>
+                {vcBalance !== null && (
+                  <p className="text-[11px] az-mono mt-1" style={{ color: vcBalance < 0 ? "#ef4444" : "var(--teal)" }}>
+                    Current balance: <strong>{vcBalance.toFixed(4)} AZR</strong>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (positive = credit, negative = debit)</label>
+                <input className="az-input" placeholder="e.g. 50 or -50" type="number" value={vcDelta} onChange={(e) => setVcDelta(e.target.value)} />
+              </div>
+              <button
+                className="az-btn-primary w-full"
+                style={Number(vcDelta) < 0 ? { background: "rgba(239,68,68,0.15)", borderColor: "#ef4444", color: "#ef4444" } : {}}
+                disabled={vcLoading || !vcDelta || !isAddress(vcWallet)}
+                onClick={async () => {
+                  setVcLoading(true);
+                  try {
+                    const res = await fetch("/api/admin/user-credit", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ wallet: vcWallet, delta: Number(vcDelta) }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) { toast(d.error ?? "Failed", "error"); }
+                    else { toast(`Balance updated: ${d.balance.toFixed(4)} AZR`); setVcBalance(d.balance); setVcDelta(""); }
+                  } catch { toast("Network error", "error"); }
+                  finally { setVcLoading(false); }
+                }}
+              >{vcLoading ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : (Number(vcDelta) < 0 ? "Debit Account" : "Credit Account")}</button>
             </div>
           </AdminCard>
 

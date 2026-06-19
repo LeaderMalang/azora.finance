@@ -37,6 +37,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (referrer.seqId >= referred.seqId) {
+      return NextResponse.json(
+        { error: `Cannot set upline: ${referrer.username} joined at #${referrer.seqId} but ${referred.username} is #${referred.seqId}. Upline must have joined earlier.` },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.user.update({
       where: { id: referred.id },
       data: { referredById: referrer.id },

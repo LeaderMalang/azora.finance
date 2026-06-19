@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const totals = earnings.reduce<{ l1: number; l2: number; l3: number }>(
     (acc, e) => {
       const level = `l${e.level}` as "l1" | "l2" | "l3";
-      acc[level] = (acc[level] ?? 0) + parseFloat(e.amount);
+      acc[level] = (acc[level] ?? 0) + parseFloat(e.amount) / 1e18;
       return acc;
     },
     { l1: 0, l2: 0, l3: 0 }

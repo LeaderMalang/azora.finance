@@ -184,36 +184,6 @@ export default function StakePage() {
     }
   };
 
-  const doUnstake = async (stakeId: bigint, unlockTime: bigint) => {
-    if (!addr) return;
-    if (Date.now() / 1000 < Number(unlockTime)) {
-      toast("Lock period has not expired yet", "error");
-      return;
-    }
-    setTxPending(true);
-    try {
-      const unstakeHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "unstake", args: [stakeId] });
-      const receipt = await publicClient!.waitForTransactionReceipt({ hash: unstakeHash });
-      toast("Unstaked · principal + rewards returned");
-      refetchBalance();
-      setTimeout(() => refetchPositions(), 3000);
-      const claimedLogs = parseEventLogs({ abi: [REWARDS_CLAIMED_EVENT] as const, logs: receipt.logs });
-      if (claimedLogs.length > 0) {
-        await Promise.all(claimedLogs.map((log) =>
-          fetch("/api/claim-history", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ wallet: addr, stakeId: Number(log.args.stakeId), amount: log.args.amount.toString(), txHash: receipt.transactionHash }),
-          })
-        ));
-        fetchClaimHistory();
-      }
-    } catch (e) {
-      toast(e instanceof Error ? e.message.slice(0, 100) : "Unstake failed", "error");
-    } finally {
-      setTxPending(false);
-    }
-  };
 
   return (
     <>
@@ -337,13 +307,6 @@ export default function StakePage() {
                               disabled={txPending}
                             >
                               {txPending ? <Spinner size="sm" /> : "Claim"}
-                            </button>
-                            <button
-                              className="az-btn-ghost text-xs px-3 py-1.5"
-                              onClick={() => doUnstake(pos.id, pos.unlockTime)}
-                              disabled={txPending || !unlocked}
-                            >
-                              Unstake
                             </button>
                           </div>
                         </td>

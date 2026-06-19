@@ -9,6 +9,7 @@ generator client {
 
 model User {
   id              String   @id @default(cuid())
+  seqId           Int      @default(autoincrement())
   username        String   @unique
   walletAddress   String   @unique
   referredByUser  User?    @relation("Referrals", fields: [referredById], references: [id])
@@ -20,6 +21,7 @@ model User {
   stakes           Stake[]
   withdrawals      Withdrawal[]
   referralEarnings ReferralEarning[]
+  userCredit       UserCredit?
 }
 
 model Stake {
@@ -57,6 +59,14 @@ model ReferralEarning {
   amount     String
   txHash     String?
   createdAt  DateTime @default(now())
+}
+
+model UserCredit {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 model ClaimHistory {
