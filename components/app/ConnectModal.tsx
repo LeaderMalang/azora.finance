@@ -2,23 +2,16 @@
 
 import { useTranslations } from "next-intl";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import {
-  useAccount,
-  useWriteContract,
-  useReadContract,
-  useDisconnect,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
 import { useState, useEffect } from "react";
-import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
-import { targetChain } from "@/lib/wagmi";
 import { Spinner } from "@/components/ui/Spinner";
+import { useAppStore } from "@/lib/store";
 
 const WALLETS = [
-  { name: "MetaMask", emoji: "🦊", desc: "Most popular EVM wallet" },
-  { name: "Trust Wallet", emoji: "🛡️", desc: "Mobile-first, multi-chain" },
-  { name: "WalletConnect", emoji: "🔗", desc: "Scan with any wallet" },
-  { name: "Coinbase Wallet", emoji: "🔵", desc: "Self-custody by Coinbase" },
+  { name: "MetaMask",       emoji: "🦊",  desc: "Most popular EVM wallet" },
+  { name: "Trust Wallet",   emoji: "🛡️", desc: "Mobile-first, multi-chain" },
+  { name: "WalletConnect",  emoji: "🔗",  desc: "Scan with any wallet" },
+  { name: "Coinbase Wallet",emoji: "🔵",  desc: "Self-custody by Coinbase" },
 ];
 
 export function ConnectModal() {
@@ -26,110 +19,79 @@ export function ConnectModal() {
   const { open } = useWeb3Modal();
   const { isConnected, address: addr } = useAccount();
   const { disconnect } = useDisconnect();
-  const { writeContractAsync } = useWriteContract();
+  const setUsername = useAppStore((s) => s.setUsername);
 
-  const [step, setStep] = useState(0);
-  const [username, setUsername] = useState("");
-  const [referral, setReferral] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    return sessionStorage.getItem('pendingReferral') ?? '';
+  const [step, setStep]               = useState(0);   // 0=wallet pick, 1=register form
+  const [usernameInput, setUsernameInput] = useState("");
+  const [referral, setReferral]       = useState(() => {
+    if (typeof window === "undefined") return "";
+    // Read from URL param first, then sessionStorage
+    const urlRef = new URLSearchParams(window.location.search).get("ref");
+    if (urlRef) sessionStorage.setItem("pendingReferral", urlRef);
+    return sessionStorage.getItem("pendingReferral") ?? "";
   });
-  const [err, setErr] = useState("");
+  const [err, setErr]                 = useState("");
+  const [checking, setChecking]       = useState(false);
+  const [checkError, setCheckError]   = useState(false);
   const [registering, setRegistering] = useState(false);
-  const [isPendingReg, setIsPendingReg] = useState(false);
-  const [regTxHash, setRegTxHash] = useState<`0x${string}` | undefined>();
-  const [confirmedRegistered, setConfirmedRegistered] = useState(false);
+  const [registered, setRegistered]   = useState(false);
 
-  // Always query the correct chain regardless of connected wallet's chain
-  const {
-    data: userInfo,
-    isFetched: userInfoFetched,
-    isError: userInfoError,
-    refetch: retryUserInfo,
-  } = useReadContract({
-    address: CONTRACTS[targetChain.id as 56 | 97].staking,
-    abi: STAKING_ABI,
-    functionName: "usersByAddress",
-    args: addr ? [addr] : undefined,
-    chainId: targetChain.id,
-    query: {
-      enabled: !!addr && isConnected,
-      refetchInterval: isPendingReg ? 2000 : false,
-      retry: 3,
-    },
-  });
-  const isRegistered = Boolean(userInfo?.[2]);
-
-  // True while wallet is connected but on-chain status not yet confirmed
-  const isChecking = isConnected && !userInfoFetched && !userInfoError;
-
-  // Watch for on-chain revert to surface the error instead of looping forever
-  const { data: txReceipt } = useWaitForTransactionReceipt({
-    hash: regTxHash,
-    query: { enabled: !!regTxHash },
-  });
+  // On wallet connect: check DB for existing user
   useEffect(() => {
-    if (!txReceipt) return;
-    if (txReceipt.status === "reverted") {
-      setIsPendingReg(false);
-      setRegistering(false);
-      setRegTxHash(undefined);
-      setErr("Transaction reverted — username may already be taken or referral is invalid.");
-    }
-  }, [txReceipt]);
+    if (!isConnected || !addr) { setStep(0); return; }
 
-  // Advance steps only after the query has confirmed status (not while loading)
-  useEffect(() => {
-    if (!isConnected) {
-      setStep(0);
-    } else if (userInfoFetched && !userInfoError && !isRegistered && !confirmedRegistered) {
-      setStep(1);
-    }
-  }, [isConnected, isRegistered, userInfoFetched, userInfoError, confirmedRegistered]);
-
-  // Stop polling and latch confirmed state once registration is detected on-chain
-  // Also sync user to DB so referral network and commission history work
-  useEffect(() => {
-    if (isRegistered) {
-      if (addr) {
-        const u = (userInfo?.[1] as string) ?? username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
-        const ref = referral.trim().replace(/\.azr$/, "");
-        if (u) {
-          fetch("/api/users", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: u, walletAddress: addr, referralUsername: ref }),
-          }).catch(() => {});
+    setChecking(true);
+    setCheckError(false);
+    fetch(`/api/users?wallet=${addr}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.user?.username) {
+          setUsername(d.user.username);
+          setRegistered(true);
+        } else {
+          setStep(1);
         }
-      }
-      setConfirmedRegistered(true);
-      setIsPendingReg(false);
-    }
-  }, [isRegistered]);
+      })
+      .catch(() => {
+        // Network error — show retry option, not registration form
+        setCheckError(true);
+      })
+      .finally(() => setChecking(false));
+  }, [isConnected, addr]);
 
-  const register = async () => {
-    const u = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
-    if (!u || u.length > 32) { setErr("Username must be 1–32 characters [a-z0-9_.]"); return; }
+  if (registered) return null;
+
+  const handleRegister = async () => {
+    const u = usernameInput.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
+    if (!u || u.length < 2 || u.length > 32) {
+      setErr("Username must be 2–32 characters (a-z, 0-9, _, .)");
+      return;
+    }
+    if (!addr) return;
     setErr("");
     setRegistering(true);
     try {
-      const chainId = targetChain.id as 56 | 97;
-      const hash = await writeContractAsync({
-        address: CONTRACTS[chainId].staking,
-        abi: STAKING_ABI,
-        functionName: "registerUser",
-        args: [u, referral.trim().replace(/\.azr$/, "")],
+      const ref = referral.trim().replace(/\.azr$/, "");
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, walletAddress: addr, referralUsername: ref || undefined }),
       });
-      setRegTxHash(hash);
-      setIsPendingReg(true);
-      sessionStorage.removeItem('pendingReferral');
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message.slice(0, 120) : "Transaction failed");
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Registration failed. Username may already be taken.");
+        return;
+      }
+      // Success — set username in store and close modal
+      setUsername(u);
+      sessionStorage.removeItem("pendingReferral");
+      setRegistered(true);
+    } catch {
+      setErr("Network error — please try again.");
+    } finally {
       setRegistering(false);
     }
   };
-
-  if (isRegistered || confirmedRegistered) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(6,10,18,0.92)", backdropFilter: "blur(16px)" }}>
@@ -145,34 +107,8 @@ export function ConnectModal() {
           <span className="font-display font-semibold text-xl">Azora</span>
         </div>
 
-        {userInfoError ? (
-          <div className="flex flex-col items-center gap-4 py-8 text-center">
-            <svg className="w-10 h-10" style={{ color: "#ff6b6b" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 8v4M12 16h.01" />
-            </svg>
-            <p className="text-sm" style={{ color: "var(--text-2)" }}>
-              Unable to verify your account. Please check your connection and try again.
-            </p>
-            <button className="az-btn-ghost text-sm px-4 py-2" onClick={() => retryUserInfo()}>
-              Retry
-            </button>
-            <button
-              className="text-sm"
-              style={{ color: "var(--muted)" }}
-              onClick={() => { disconnect(); setStep(0); }}
-            >
-              ← Choose another wallet
-            </button>
-          </div>
-        ) : isChecking ? (
-          <div className="flex flex-col items-center gap-4 py-8">
-            <Spinner size="lg" />
-            <p className="text-sm text-center" style={{ color: "var(--text-2)" }}>
-              Verifying your account…
-            </p>
-          </div>
-        ) : step === 0 ? (
+        {/* Step 0: Choose wallet */}
+        {step === 0 && !checking && (
           <>
             <h2 className="font-display font-bold text-2xl mb-2">{t("title")}</h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-2)" }}>{t("sub")}</p>
@@ -194,73 +130,104 @@ export function ConnectModal() {
               ))}
             </div>
           </>
-        ) : step === 1 ? (
+        )}
+
+        {/* Checking DB */}
+        {checking && (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <Spinner size="lg" />
+            <p className="text-sm text-center" style={{ color: "var(--text-2)" }}>Verifying your account…</p>
+          </div>
+        )}
+
+        {/* DB check error — retry instead of silently showing registration form */}
+        {checkError && !checking && (
+          <div className="flex flex-col items-center gap-4 py-8 text-center">
+            <svg className="w-10 h-10" style={{ color: "#f3ba2f" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <p className="text-sm" style={{ color: "var(--text-2)" }}>Unable to verify your account. Check your connection and try again.</p>
+            <button className="az-btn-primary px-6 py-2 text-sm" onClick={() => {
+              setCheckError(false);
+              setChecking(true);
+              fetch(`/api/users?wallet=${addr}`)
+                .then(r => r.json())
+                .then(d => { if (d.user?.username) { setUsername(d.user.username); setRegistered(true); } else { setStep(1); } })
+                .catch(() => setCheckError(true))
+                .finally(() => setChecking(false));
+            }}>Retry</button>
+            <button className="text-sm" style={{ color: "var(--muted)" }} onClick={() => { disconnect(); setStep(0); setCheckError(false); }}>
+              ← Choose another wallet
+            </button>
+          </div>
+        )}
+
+        {/* Step 1: Register username (DB-only, no gas) */}
+        {step === 1 && !checking && (
           <>
             <h2 className="font-display font-bold text-2xl mb-2">{t("registerTitle")}</h2>
-            <p className="text-sm mb-6" style={{ color: "var(--text-2)" }}>{t("registerSub")}</p>
-
-            {isPendingReg ? (
-              <div className="flex flex-col items-center gap-4 py-8">
-                <Spinner size="lg" />
-                <p className="text-sm text-center" style={{ color: "var(--text-2)" }}>
-                  Confirming on-chain… this takes 15–30 seconds.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>Username</label>
-                  <div className="relative">
-                    <input
-                      className="az-input pr-12"
-                      placeholder="satoshi"
-                      value={username}
-                      onChange={(e) => { setUsername(e.target.value); setErr(""); }}
-                      onKeyDown={(e) => e.key === "Enter" && register()}
-                      autoFocus
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm az-mono" style={{ color: "var(--muted)" }}>.azr</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>
-                    Referrer username <span style={{ color: "var(--muted)", opacity: 0.6 }}>(optional)</span>
-                  </label>
+            <p className="text-sm mb-2" style={{ color: "var(--text-2)" }}>{t("registerSub")}</p>
+            <div className="flex items-center gap-2 mb-6 text-[11px] az-mono px-3 py-2 rounded-ctl" style={{ background: "rgba(45,212,191,0.06)", color: "var(--teal)" }}>
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+              No gas fee — instant, free registration
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>Username</label>
+                <div className="relative">
                   <input
-                    className="az-input"
-                    placeholder="friend.azr"
-                    value={referral}
-                    onChange={(e) => setReferral(e.target.value)}
+                    className="az-input pr-12"
+                    placeholder="satoshi"
+                    value={usernameInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const clean = raw.toLowerCase().replace(/[^a-z0-9_.]/g, "");
+                      setUsernameInput(raw);
+                      setErr(raw !== clean && raw.length > 0 ? `Only letters, numbers, _ and . allowed. Will be saved as: "${clean}"` : "");
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+                    autoFocus
                   />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm az-mono" style={{ color: "var(--muted)" }}>.azr</span>
                 </div>
-                {err && <p className="text-xs" style={{ color: "#ff6b6b" }}>{err}</p>}
-                <button
-                  className="az-btn-primary w-full"
-                  onClick={register}
-                  disabled={registering || isPendingReg}
-                >
-                  {registering ? t("registering") : t("register")}
-                  {!registering && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
-                </button>
-                <button
-                  className="w-full text-center text-sm"
-                  style={{ color: "var(--muted)" }}
-                  onClick={() => { disconnect(); setStep(0); }}
-                >
-                  ← Choose another wallet
-                </button>
               </div>
-            )}
+              <div>
+                <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>
+                  Referrer username <span style={{ opacity: 0.6 }}>(optional)</span>
+                </label>
+                <input
+                  className="az-input"
+                  placeholder="friend.azr"
+                  value={referral}
+                  onChange={(e) => setReferral(e.target.value)}
+                />
+              </div>
+              {err && <p className="text-xs" style={{ color: "#ff6b6b" }}>{err}</p>}
+              <button
+                className="az-btn-primary w-full"
+                onClick={handleRegister}
+                disabled={registering}
+              >
+                {registering
+                  ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Creating account…</span>
+                  : <span className="flex items-center justify-center gap-2">{t("register")}<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                }
+              </button>
+              <button
+                className="w-full text-center text-sm"
+                style={{ color: "var(--muted)" }}
+                onClick={() => { disconnect(); setStep(0); setRegistered(false); }}
+              >
+                ← Choose another wallet
+              </button>
+            </div>
           </>
-        ) : null}
+        )}
 
         <div className="flex justify-center gap-2 mt-6">
           {[0, 1].map((i) => (
-            <span
-              key={i}
-              className="w-2 h-2 rounded-full transition-all"
-              style={{ background: step === i ? "var(--teal)" : "var(--line)" }}
-            />
+            <span key={i} className="w-2 h-2 rounded-full transition-all"
+              style={{ background: step === i ? "var(--teal)" : "var(--line)" }} />
           ))}
         </div>
       </div>

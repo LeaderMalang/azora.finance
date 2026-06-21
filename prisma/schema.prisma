@@ -21,7 +21,6 @@ model User {
   stakes              Stake[]
   withdrawals         Withdrawal[]
   referralEarnings    ReferralEarning[]
-  userCredit          UserCredit?
   userBalance         UserBalance?
   deposits            Deposit[]
   virtualStakes       VirtualStake[]
@@ -65,14 +64,6 @@ model ReferralEarning {
   createdAt  DateTime @default(now())
 }
 
-model UserCredit {
-  id        Int      @id @default(autoincrement())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  balance   Float    @default(0)
-  updatedAt DateTime @updatedAt
-}
-
 model UserBalance {
   id          Int      @id @default(autoincrement())
   userId      String   @unique
@@ -80,6 +71,28 @@ model UserBalance {
   usdtBalance Float    @default(0)
   azrBalance  Float    @default(0)
   updatedAt   DateTime @updatedAt
+}
+
+model AdminWallet {
+  id            Int      @id @default(autoincrement())
+  walletAddress String   @unique
+  label         String   @default("")
+  addedAt       DateTime @default(now())
+  addedBy       String   @default("")
+  isActive      Boolean  @default(true)
+}
+
+model AppSettings {
+  id               Int      @id @default(1)
+  minStakeAzr      Float    @default(50)
+  lockDays         Int      @default(150)
+  dailyRewardPct   Float    @default(0.7)
+  minWithdrawal    Float    @default(0)
+  withdrawalFeePct Float    @default(0)
+  referralRateL1   Float    @default(5)
+  referralRateL2   Float    @default(3)
+  referralRateL3   Float    @default(1)
+  updatedAt        DateTime @updatedAt
 }
 
 model Deposit {

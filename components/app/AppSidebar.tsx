@@ -9,6 +9,7 @@ import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useEffect, useState } from "react";
 import { NetworkSwitcher } from "./NetworkSwitcher";
 import { useSidebar } from "./SidebarContext";
+import { useAppStore } from "@/lib/store";
 
 const NAV = [
   {
@@ -25,7 +26,8 @@ const NAV = [
   { key: "withdrawals", icon: '<path d="M12 3v12M8 11l4 4 4-4M5 21h14"/>' },
 ];
 
-export function AppSidebar({ locale, username, isOwner }: { locale: string; username: string; isOwner: boolean }) {
+export function AppSidebar({ locale, isOwner }: { locale: string; isOwner: boolean }) {
+  const username = useAppStore((s) => s.username);
   const t = useTranslations("app");
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();

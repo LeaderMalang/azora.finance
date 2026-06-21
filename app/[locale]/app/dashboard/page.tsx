@@ -81,7 +81,7 @@ function SkeletonKpiCard() {
   );
 }
 
-const RATE_PER_SEC = 0.007 / 86400;
+// RATE_PER_SEC now read from DB settings (dailyRate state)
 
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [stakes, setStakes]           = useState<VirtualStake[]>([]);
   const [pendingDisplay, setPendingDisplay] = useState("0.0000");
   const [refTotal, setRefTotal]       = useState<number | null>(null);
+  const [dailyRate, setDailyRate]     = useState(0.7);
 
   // Load virtual balances + stakes + referral earnings
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function DashboardPage() {
       setAzrBal(bal.azrBalance ?? 0);
       setUsdtBal(bal.usdtBalance ?? 0);
       setStakes(stakeData.stakes ?? []);
+      if (stakeData.dailyRewardPct !== undefined) setDailyRate(stakeData.dailyRewardPct);
       const t2 = refData.totals;
       if (t2) setRefTotal((t2.l1 ?? 0) + (t2.l2 ?? 0) + (t2.l3 ?? 0));
     }).catch(() => {}).finally(() => setLoading(false));
@@ -121,9 +123,10 @@ export default function DashboardPage() {
     if (!hasStake) return;
     const id = setInterval(() => {
       const now = Date.now() / 1000;
+      const ratePerSec = dailyRate / 100 / 86400;
       const total = activeStakes.reduce((sum, pos) => {
         const elapsed = now - new Date(pos.lastClaimTime).getTime() / 1000;
-        return sum + pos.amount * RATE_PER_SEC * elapsed;
+        return sum + pos.amount * ratePerSec * elapsed;
       }, 0);
       setPendingDisplay(total.toFixed(4));
     }, 1000);
@@ -148,7 +151,7 @@ export default function DashboardPage() {
                 sub={hasStake ? `${activeStakes.length} active position${activeStakes.length !== 1 ? "s" : ""}` : "No active stake"}
                 glow
               />
-              <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub="accruing 0.7% / day" />
+              <KpiCard label={t("claimable")} value={pendingDisplay} unit="AZR" sub={`accruing ${dailyRate}% / day`} />
               <KpiCard
                 label={t("portfolio")}
                 value={(staked + parseFloat(pendingDisplay)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

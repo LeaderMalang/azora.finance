@@ -7,8 +7,6 @@ import { useAccount } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 
-const TREASURY_WALLET = process.env.NEXT_PUBLIC_TREASURY_WALLET ?? "";
-
 type Deposit = {
   id: number;
   txHash: string;
@@ -29,6 +27,15 @@ export default function DepositPage() {
   const [copied, setCopied] = useState(false);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [balance, setBalance] = useState<Balance>({ usdtBalance: 0, azrBalance: 0 });
+  const [treasuryWallet, setTreasuryWallet] = useState("");
+
+  // Fetch treasury wallet at runtime — not a build-time env var so it works on cPanel
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((d) => { if (d.treasuryWallet) setTreasuryWallet(d.treasuryWallet); })
+      .catch(() => {});
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!addr) return;
@@ -102,7 +109,7 @@ export default function DepositPage() {
           <p className="text-xs mb-4" style={{ color: "var(--text-2)" }}>
             Send USDT (BEP-20) from your external wallet to the address below. Once confirmed on BSC, submit your transaction hash in Step 2.
           </p>
-          {TREASURY_WALLET ? (
+          {treasuryWallet ? (
             <div>
               <label className="text-[11px] az-mono mb-2 block" style={{ color: "var(--muted)" }}>Treasury Wallet Address (BNB Chain / BEP-20)</label>
               <div className="flex gap-2 items-center">
@@ -110,12 +117,12 @@ export default function DepositPage() {
                   className="flex-1 rounded-ctl px-3 py-2.5 text-sm az-mono break-all"
                   style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--teal)" }}
                 >
-                  {TREASURY_WALLET}
+                  {treasuryWallet}
                 </div>
                 <button
                   className="px-3 py-2.5 rounded-ctl text-xs font-semibold flex-shrink-0"
                   style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
-                  onClick={() => copy(TREASURY_WALLET)}
+                  onClick={() => copy(treasuryWallet)}
                 >
                   {copied ? "Copied!" : "Copy"}
                 </button>
@@ -154,7 +161,7 @@ export default function DepositPage() {
               <button
                 className="az-btn-primary w-full"
                 onClick={handleDeposit}
-                disabled={submitting || !txHash.trim() || !TREASURY_WALLET}
+                disabled={submitting || !txHash.trim() || !treasuryWallet}
               >
                 {submitting
                   ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Verifying on-chain…</span>

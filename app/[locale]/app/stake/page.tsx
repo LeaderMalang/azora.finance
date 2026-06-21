@@ -20,19 +20,18 @@ type VirtualStake = {
 
 type ClaimRow = { date: string; amount: string };
 
-const RATE_PER_SEC = 0.007 / 86400;
-
 export default function StakePage() {
   const t = useTranslations("staking");
   const { address: addr } = useAccount();
   const { toast } = useToast();
 
-  const [amount, setAmount]     = useState("");
-  const [pending, setPending]   = useState(false);
+  const [amount, setAmount]          = useState("");
+  const [pending, setPending]        = useState(false);
   const [azrBalance, setAzrBalance]  = useState(0);
   const [stakes, setStakes]          = useState<VirtualStake[]>([]);
   const [lockDays, setLockDays]      = useState(150);
   const [minStake, setMinStake]      = useState(50);
+  const [dailyRate, setDailyRate]    = useState(0.7);
   const [claimHistory, setClaimHistory] = useState<ClaimRow[]>([]);
   // Live pending display updated every second
   const [liveRewards, setLiveRewards] = useState<Record<number, number>>({});
@@ -51,6 +50,7 @@ export default function StakePage() {
       setStakes(d.stakes ?? []);
       if (d.lockDays) setLockDays(d.lockDays);
       if (d.minStake) setMinStake(d.minStake);
+      if (d.dailyRewardPct !== undefined) setDailyRate(d.dailyRewardPct);
     }
   }, [addr]);
 
@@ -81,7 +81,8 @@ export default function StakePage() {
       const map: Record<number, number> = {};
       for (const s of active) {
         const base = s.pendingRewards;
-        const extra = s.amount * RATE_PER_SEC * (now - (new Date(s.lastClaimTime).getTime() / 1000));
+        const ratePerSec = dailyRate / 100 / 86400;
+        const extra = s.amount * ratePerSec * (now - (new Date(s.lastClaimTime).getTime() / 1000));
         map[s.id] = Math.max(0, base + extra - s.pendingRewards) + s.pendingRewards;
       }
       setLiveRewards(map);
@@ -131,12 +132,12 @@ export default function StakePage() {
   };
 
   const activeStakes = stakes.filter((s) => s.isActive);
-  const estDaily = amount ? (parseFloat(amount || "0") * 0.007).toFixed(2) : "0.00";
+  const estDaily = amount ? (parseFloat(amount || "0") * (dailyRate / 100)).toFixed(2) : "0.00";
   const totalPending = activeStakes.reduce((s, p) => s + (liveRewards[p.id] ?? p.pendingRewards), 0);
 
   return (
     <>
-      <AppTopbar title={t("title")} sub={`Lock AZR for ${lockDays} days · 0.7% daily`} />
+      <AppTopbar title={t("title")} sub={`Lock AZR for ${lockDays} days · ${dailyRate}% daily`} />
       <div className="p-4 md:p-8 max-w-app">
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -157,7 +158,7 @@ export default function StakePage() {
               {[
                 { k: t("minStake"), v: `${minStake} AZR` },
                 { k: t("lockPeriod"), v: `${lockDays}d` },
-                { k: t("daily"), v: "0.7%" },
+                { k: t("daily"), v: `${dailyRate}%` },
               ].map((s) => (
                 <div key={s.k} className="text-center">
                   <div className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>{s.k}</div>
@@ -185,7 +186,7 @@ export default function StakePage() {
             {activeStakes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-sm" style={{ color: "var(--text-2)" }}>
                 <p>No active positions.</p>
-                <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>Stake AZR to start earning 0.7% daily.</p>
+                <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>Stake AZR to start earning {dailyRate}% daily.</p>
               </div>
             ) : (
               <>

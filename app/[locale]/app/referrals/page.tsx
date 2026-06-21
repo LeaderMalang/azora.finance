@@ -4,11 +4,12 @@ import { AppTopbar } from "@/components/app/AppTopbar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, usePublicClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { formatUnits } from "viem";
 import { CONTRACTS, STAKING_ABI, REFERRAL_COMMISSION_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
+import { useAppStore } from "@/lib/store";
 
 async function getLogsChunked(
   client: ReturnType<typeof usePublicClient>,
@@ -100,31 +101,23 @@ export default function ReferralsPage() {
   const [dbUpline, setDbUpline] = useState("");
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
 
-  const { data: userInfo } = useReadContract({
-    address: CONTRACTS[chainId].staking,
-    abi: STAKING_ABI,
-    functionName: "usersByAddress",
-    args: addr ? [addr] : undefined,
-    query: { enabled: !!addr },
-  });
-  const username = (userInfo?.[1] as string) ?? "";
+  const username = useAppStore((s) => s.username);
 
-  const { data: uplineData } = useReadContract({
-    address: CONTRACTS[chainId].staking,
-    abi: STAKING_ABI,
-    functionName: "referredBy",
-    args: username ? [username] : undefined,
-    query: { enabled: !!username },
-  });
-  const upline = (uplineData as string) ?? "";
+  // Upline and rates come from DB (not on-chain) in the custodial system
+  const upline = ""; // dbUpline is the authoritative source; see setDbUpline in fetchFromDB
 
-  const { data: l1Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL1", query: { enabled: true } });
-  const { data: l2Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL2", query: { enabled: true } });
-  const { data: l3Rate } = useReadContract({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "referralRateL3", query: { enabled: true } });
-  const fmtRate = (r: unknown) => r !== undefined ? `${(Number(r as bigint) / 100).toFixed(1)}%` : "—";
+  const [rates, setRates] = useState({ l1: 5, l2: 3, l3: 1 });
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(d => { if (d.referralRateL1 !== undefined) setRates({ l1: d.referralRateL1, l2: d.referralRateL2, l3: d.referralRateL3 }); })
+      .catch(() => {});
+  }, []);
+  const fmtRate = (r: number) => `${r.toFixed(1)}%`;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://azora.finance";
-  const refLink = username ? `${appUrl}?ref=${username}` : `${appUrl}?ref=${addr?.slice(0, 8) ?? ""}`;
+  // Only show referral link if user has a username — wallet address prefix is not a valid referral code
+  const refLink = username ? `${appUrl}?ref=${username}` : null;
 
   const fetchFromDB = useCallback(async () => {
     if (!addr) return;
@@ -246,7 +239,7 @@ export default function ReferralsPage() {
   const filteredCommissions = lvlFilter === -1 ? entries : entries.filter((e) => e.level === lvlFilter);
 
   const copy = () => {
-    navigator.clipboard.writeText(refLink);
+    navigator.clipboard.writeText(refLink ?? "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -261,17 +254,23 @@ export default function ReferralsPage() {
         {/* Referral link */}
         <div className="az-card mb-6">
           <h3 className="font-semibold mb-4">{t("yourLink")}</h3>
-          <div className="flex gap-2">
-            <div
-              className="flex-1 rounded-ctl border px-4 py-3 az-mono text-sm truncate"
-              style={{ background: "var(--bg-2)", borderColor: "var(--line)", color: "var(--text-2)" }}
-            >
-              {refLink}
+          {refLink ? (
+            <div className="flex gap-2">
+              <div
+                className="flex-1 rounded-ctl border px-4 py-3 az-mono text-sm truncate"
+                style={{ background: "var(--bg-2)", borderColor: "var(--line)", color: "var(--text-2)" }}
+              >
+                {refLink}
+              </div>
+              <button className="az-btn-primary px-5" onClick={copy}>
+                {copied ? t("copied") : t("copy")}
+              </button>
             </div>
-            <button className="az-btn-primary px-5" onClick={copy}>
-              {copied ? t("copied") : t("copy")}
-            </button>
-          </div>
+          ) : (
+            <div className="rounded-ctl px-4 py-3 text-sm" style={{ background: "rgba(243,186,47,0.06)", border: "1px solid rgba(243,186,47,0.2)", color: "#f3ba2f" }}>
+              Complete your registration to get your referral link.
+            </div>
+          )}
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
             <div className="text-xs az-mono mb-1" style={{ color: "var(--muted)" }}>Your Referrer / Upline</div>
             {!username && !dbUpline ? (
@@ -303,9 +302,9 @@ export default function ReferralsPage() {
         {/* Level earnings summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           {[
-            { label: t("l1Earnings"), pct: fmtRate(l1Rate), lvl: 1 },
-            { label: t("l2Earnings"), pct: fmtRate(l2Rate), lvl: 2 },
-            { label: t("l3Earnings"), pct: fmtRate(l3Rate), lvl: 3 },
+            { label: t("l1Earnings"), pct: fmtRate(rates.l1), lvl: 1 },
+            { label: t("l2Earnings"), pct: fmtRate(rates.l2), lvl: 2 },
+            { label: t("l3Earnings"), pct: fmtRate(rates.l3), lvl: 3 },
           ].map((c) => (
             <div key={c.lvl} className="az-card text-center">
               <div className="font-display font-bold text-3xl mb-1 text-teal">{c.pct}</div>
@@ -327,7 +326,7 @@ export default function ReferralsPage() {
           >
             When network members stake, you earn:
             <span className="az-mono font-semibold ml-1" style={{ color: "var(--teal)" }}>
-              L1 {fmtRate(l1Rate)} · L2 {fmtRate(l2Rate)} · L3 {fmtRate(l3Rate)}
+              L1 {fmtRate(rates.l1)} · L2 {fmtRate(rates.l2)} · L3 {fmtRate(rates.l3)}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -383,9 +382,9 @@ export default function ReferralsPage() {
                 onChange={(e) => setLvlFilter(Number(e.target.value))}
               >
                 <option value={-1}>All Levels</option>
-                <option value={1}>L1 (6%)</option>
-                <option value={2}>L2 (4%)</option>
-                <option value={3}>L3 (3%)</option>
+                <option value={1}>L1 ({fmtRate(rates.l1)})</option>
+                <option value={2}>L2 ({fmtRate(rates.l2)})</option>
+                <option value={3}>L3 ({fmtRate(rates.l3)})</option>
               </select>
               <button
                 className="az-btn-ghost text-xs px-3 py-1.5"

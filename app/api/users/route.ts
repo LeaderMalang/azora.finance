@@ -39,14 +39,19 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const wallet = req.nextUrl.searchParams.get("wallet");
-  const username = req.nextUrl.searchParams.get("username");
-  if (!wallet && !username) {
-    return NextResponse.json({ error: "Provide wallet or username" }, { status: 400 });
+  try {
+    const wallet   = req.nextUrl.searchParams.get("wallet");
+    const username = req.nextUrl.searchParams.get("username");
+    if (!wallet && !username) return NextResponse.json({ user: null });
+    const user = await prisma.user.findFirst({
+      where: wallet
+        ? { walletAddress: { equals: wallet, mode: "insensitive" } }
+        : { username: { equals: username!, mode: "insensitive" } },
+      select: { username: true, referredByUser: { select: { username: true } } },
+    });
+    return NextResponse.json({ user: user ?? null });
+  } catch (e) {
+    console.error("[api/users GET]", e instanceof Error ? e.message : e);
+    return NextResponse.json({ user: null }); // 200 so browser doesn't error-out
   }
-  const user = await prisma.user.findFirst({
-    where: wallet ? { walletAddress: wallet } : { username: username! },
-  });
-  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(user);
 }

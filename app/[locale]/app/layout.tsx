@@ -10,6 +10,7 @@ import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { useState, useEffect } from "react";
 import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
+import { useAppStore } from "@/lib/store";
 
 function WrongNetworkBanner() {
   const { isConnected, chainId } = useAccount();
@@ -42,6 +43,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const [mounted, setMounted] = useState(false);
   const [wasConnected, setWasConnected] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const setUsername = useAppStore((s) => s.setUsername);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -49,6 +51,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
     if (isConnected) {
       setWasConnected(true);
     } else if (wasConnected && mounted) {
+      setUsername(""); // Clear stale username when wallet disconnects
       window.location.href = `/${locale}`;
     }
   }, [isConnected, mounted]);
@@ -71,28 +74,42 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   });
 
   const isRegistered = Boolean(userInfo?.[2]);
-  const username = (userInfo?.[1] as string) ?? "";
+  const contractUsername = (userInfo?.[1] as string) ?? "";
   const isOwner = !!addr && !!ownerAddr && addr.toLowerCase() === (ownerAddr as string).toLowerCase();
+
+  // DB-first username load — fast and reliable for existing users
+  useEffect(() => {
+    if (!addr) return; // Don't clear on transient undefined during wagmi hydration
+    fetch(`/api/users?wallet=${addr}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.user?.username) setUsername(d.user.username); })
+      .catch((e) => console.error("[username fetch]", e));
+  }, [addr, setUsername]);
+
+  // Contract fallback — sets store when RPC resolves (covers new/unregistered users)
+  useEffect(() => {
+    if (contractUsername) setUsername(contractUsername);
+  }, [contractUsername, setUsername]);
 
   const { data: referredByData } = useReadContract({
     address: CONTRACTS[targetChain.id as 56 | 97].staking,
     abi: STAKING_ABI,
     functionName: "referredBy",
-    args: username ? [username] : undefined,
+    args: contractUsername ? [contractUsername] : undefined,
     chainId: targetChain.id,
-    query: { enabled: !!username && isRegistered },
+    query: { enabled: !!contractUsername && isRegistered },
   });
 
-  // Sync every registered wallet to DB on app load so referral network is populated
+  // Sync registered wallet to DB (ensures referral links are saved)
   useEffect(() => {
-    if (!isRegistered || !addr || !username) return;
+    if (!isRegistered || !addr || !contractUsername) return;
     const referrer = (referredByData as string) ?? "";
     fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, walletAddress: addr, referralUsername: referrer }),
+      body: JSON.stringify({ username: contractUsername, walletAddress: addr, referralUsername: referrer }),
     }).catch(() => {});
-  }, [isRegistered, addr, username, referredByData]);
+  }, [isRegistered, addr, contractUsername, referredByData]);
 
   const showModal = mounted && isConnected && !isRegistered;
 
@@ -109,7 +126,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
           />
         )}
         <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
-          <AppSidebar locale={locale} username={username} isOwner={isOwner} />
+          <AppSidebar locale={locale} isOwner={isOwner} />
           <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
             <WrongNetworkBanner />
             {!mounted ? (

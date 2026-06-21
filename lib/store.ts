@@ -12,6 +12,8 @@ interface AppStore {
   setRegisterStep: (v: number) => void;
   activeChainId: 56 | 97;
   setActiveChainId: (id: 56 | 97) => void;
+  username: string;
+  setUsername: (u: string) => void;
 }
 
 const defaultChainId = (Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97) === 56 ? 56 : 97) as 56 | 97;
@@ -27,7 +29,16 @@ export const useAppStore = create<AppStore>()(
       setRegisterStep: (v) => set({ registerStep: v }),
       activeChainId: defaultChainId,
       setActiveChainId: (id) => set({ activeChainId: id }),
+      username: "",
+      setUsername: (u) => set({ username: u }),
     }),
-    { name: "azora-app-state-v1" }
+    {
+      name: "azora-app-state-v1",
+      partialize: (state) => ({
+        locale: state.locale,
+        activeChainId: state.activeChainId,
+        // username excluded — loaded fresh each session, not persisted
+      }),
+    }
   )
 );

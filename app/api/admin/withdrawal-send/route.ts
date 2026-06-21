@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdmin } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyAdmin(req);
+  if (!auth.ok) return auth.response;
   try {
     const { withdrawalId, sentTxHash, action } = await req.json();
     if (!withdrawalId || !action) {

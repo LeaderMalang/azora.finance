@@ -39,17 +39,20 @@ export default function WithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<VirtualWithdrawal[]>([]);
   const [statusFilter, setStatusFilter] = useState(-1);
   const [assetFilter, setAssetFilter]   = useState(-1);
+  const [withdrawalFee, setWithdrawalFee] = useState(0);
 
   const fetchData = useCallback(async () => {
     if (!addr) return;
     setLoading(true);
     try {
-      const [balRes, wdRes] = await Promise.all([
+      const [balRes, wdRes, settingsRes] = await Promise.all([
         fetch(`/api/virtual/balance?wallet=${addr}`),
         fetch(`/api/virtual/withdraw?wallet=${addr}`),
+        fetch("/api/admin/settings"),
       ]);
       if (balRes.ok) { const d = await balRes.json(); setAzrBalance(d.azrBalance ?? 0); setUsdtBalance(d.usdtBalance ?? 0); }
       if (wdRes.ok)  { const d = await wdRes.json();  setWithdrawals(d.withdrawals ?? []); }
+      if (settingsRes.ok) { const d = await settingsRes.json(); setWithdrawalFee(d.withdrawalFeePct ?? 0); }
     } finally { setLoading(false); }
   }, [addr]);
 
@@ -122,17 +125,40 @@ export default function WithdrawalsPage() {
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs az-mono" style={{ color: "var(--muted)" }}>{t("amount")}</label>
-                <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>
+                <span className="text-xs az-mono flex items-center gap-2" style={{ color: "var(--muted)" }}>
                   Balance: {loading && !!addr ? <Skeleton className="inline-block w-16 h-3" /> : `${bal.toFixed(4)} ${assetLabel}`}
+                  {bal > 0 && (
+                    <button className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
+                      onClick={() => setAmount(bal.toFixed(4))}>MAX</button>
+                  )}
                 </span>
               </div>
               <input className="az-input" type="number" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setInputErr(""); }} disabled={submitting} />
+              {withdrawalFee > 0 && bal > 0 && (
+                <p className="text-[11px] az-mono mt-1" style={{ color: "var(--muted)" }}>
+                  Max you receive after {withdrawalFee}% fee: {(bal * (1 - withdrawalFee / 100)).toFixed(4)} {assetLabel}
+                </p>
+              )}
             </div>
 
             <div className="mb-5">
               <label className="text-xs az-mono mb-2 block" style={{ color: "var(--muted)" }}>Destination Wallet (BEP-20 / BSC)</label>
               <input className="az-input" placeholder="0x..." value={toWallet} onChange={(e) => { setToWallet(e.target.value); setInputErr(""); }} disabled={submitting} />
             </div>
+
+            {/* Fee breakdown */}
+            {withdrawalFee > 0 && amount && parseFloat(amount) > 0 && (
+              <div className="mb-4 text-xs space-y-1">
+                <div className="flex justify-between" style={{ color: "var(--text-2)" }}>
+                  <span>Fee ({withdrawalFee}%)</span>
+                  <span className="az-mono">−{(parseFloat(amount) * withdrawalFee / 100).toFixed(4)} {assetLabel}</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>You receive</span>
+                  <span className="az-mono text-teal">{(parseFloat(amount) * (1 - withdrawalFee / 100)).toFixed(4)} {assetLabel}</span>
+                </div>
+              </div>
+            )}
 
             {inputErr && <p className="text-xs mb-3" style={{ color: "#ff6b6b" }}>{inputErr}</p>}
             {submitting && (
