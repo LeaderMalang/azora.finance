@@ -15,6 +15,7 @@ const NAV = [
     key: "dashboard",
     icon: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   },
+  { key: "deposit", icon: '<path d="M12 3v12M8 11l4 4 4-4M19 17v2a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-2"/>' },
   { key: "swap", icon: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7M17 20l4-4M17 20l-4-4"/>' },
   { key: "stake", icon: '<path d="M12 2v20M5 9l7-7 7 7M5 15l7 7 7-7"/>' },
   {
@@ -40,6 +41,7 @@ export function AppSidebar({ locale, username, isOwner }: { locale: string; user
 
   const labels: Record<string, string> = {
     dashboard: t("dashboard"),
+    deposit: "Deposit",
     swap: t("swap"),
     stake: t("stake"),
     referrals: t("referrals"),

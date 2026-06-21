@@ -152,3 +152,6 @@ Translation strings live in `messages/<locale>.json`. Add a new locale by adding
 See [DEPLOY.md](./DEPLOY.md) for the full Docker / Nginx self-hosted deployment guide.
 
 For Vercel, set the five environment variables listed above in the Vercel dashboard and connect the repo. The build command is `prisma generate && next build`.
+
+
+ qvLsaWtB6=Xk@&b6

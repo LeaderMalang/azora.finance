@@ -2,11 +2,8 @@
 
 import { AppTopbar } from "@/components/app/AppTopbar";
 import { useTranslations } from "next-intl";
-import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
-import { CONTRACTS, ERC20_ABI, STAKING_ABI } from "@/lib/contracts";
-import { useActiveChain } from "@/lib/hooks";
-import { formatUnits, parseUnits } from "viem";
-import { useState } from "react";
+import { useAccount } from "wagmi";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { TokenIcon } from "@/components/ui/TokenIcon";
@@ -15,46 +12,48 @@ export default function SwapPage() {
   const t = useTranslations("swap");
   const { address: addr } = useAccount();
   const { toast } = useToast();
-  const { chainId } = useActiveChain();
 
-  const [dir, setDir] = useState<"buy" | "sell">("buy");
+  const [dir, setDir]     = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
-  const [txPending, setTxPending] = useState(false);
-  const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
+  const [pending, setPending] = useState(false);
+  const [usdtBal, setUsdtBal] = useState(0);
+  const [azrBal,  setAzrBal]  = useState(0);
 
-  const { data: usdtBal, refetch: refetchUsdt } = useReadContract({ address: CONTRACTS[chainId].usdt, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
-  const { data: azrBal, refetch: refetchAzr } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: addr ? [addr] : undefined, query: { enabled: !!addr } });
+  const fetchBalance = useCallback(async () => {
+    if (!addr) return;
+    const res = await fetch(`/api/virtual/balance?wallet=${addr}`);
+    if (res.ok) { const d = await res.json(); setUsdtBal(d.usdtBalance ?? 0); setAzrBal(d.azrBalance ?? 0); }
+  }, [addr]);
 
-  const fromBal = dir === "buy" ? (usdtBal ? parseFloat(formatUnits(usdtBal as bigint, 18)) : 0) : (azrBal ? parseFloat(formatUnits(azrBal as bigint, 18)) : 0);
+  useEffect(() => { fetchBalance(); }, [fetchBalance]);
+
+  const fromBal   = dir === "buy" ? usdtBal : azrBal;
   const fromLabel = dir === "buy" ? "USDT" : "AZR";
-  const toLabel = dir === "buy" ? "AZR" : "USDT";
+  const toLabel   = dir === "buy" ? "AZR"  : "USDT";
 
   const doSwap = async () => {
     if (!addr || !amount || parseFloat(amount) <= 0) return;
-    setTxPending(true);
-    const parsed = parseUnits(amount, 18);
+    const amt = parseFloat(amount);
+    if (amt > fromBal) { toast(`Insufficient ${fromLabel} balance`, "error"); return; }
+    setPending(true);
     try {
-      const approveAddr = dir === "buy" ? CONTRACTS[chainId].usdt : CONTRACTS[chainId].azoraToken;
-      const approveHash = await writeContractAsync({ address: approveAddr, abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS[chainId].staking, parsed] });
-      await publicClient!.waitForTransactionReceipt({ hash: approveHash });
-      const fn = dir === "buy" ? "swapUSDTForToken" : "swapTokenForUSDT";
-      const swapHash = await writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: fn, args: [parsed] });
-      await publicClient!.waitForTransactionReceipt({ hash: swapHash });
-      toast(`Swapped ${amount} ${fromLabel} → ${toLabel}`);
+      const res = await fetch("/api/virtual/swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: addr, amount: amt, direction: dir }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast(d.error ?? "Swap failed", "error"); return; }
+      toast(`Swapped ${amt} ${fromLabel} → ${amt} ${toLabel}`);
       setAmount("");
-      refetchUsdt();
-      refetchAzr();
-    } catch (e) {
-      toast(e instanceof Error ? e.message.slice(0, 100) : "Transaction failed", "error");
-    } finally {
-      setTxPending(false);
-    }
+      fetchBalance();
+    } catch { toast("Network error", "error"); }
+    finally { setPending(false); }
   };
 
   return (
     <>
-      <AppTopbar title={t("title")} sub="Exchange USDT ↔ AZR · 1:1 reserve rate" />
+      <AppTopbar title={t("title")} sub="Exchange USDT ↔ AZR · instant · no gas" />
       <div className="p-4 md:p-8 max-w-app">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
@@ -91,12 +90,12 @@ export default function SwapPage() {
 
               <div className="space-y-3 mb-6">
                 {[
-                  { icon: "✓", text: "No slippage — fixed 1:1 reserve rate" },
-                  { icon: "✓", text: "Instant settlement on BNB Smart Chain" },
-                  { icon: "✓", text: "Swap AZR to stake and earn 0.7% daily" },
+                  { text: "No slippage — fixed 1:1 reserve rate" },
+                  { text: "Instant settlement — no gas fees, no waiting" },
+                  { text: "Swap AZR to stake and earn 0.7% daily" },
                 ].map((item) => (
                   <div key={item.text} className="flex items-start gap-2.5 text-sm" style={{ color: "var(--text-2)" }}>
-                    <span className="font-bold mt-px" style={{ color: "var(--teal)" }}>{item.icon}</span>
+                    <span className="font-bold mt-px" style={{ color: "var(--teal)" }}>✓</span>
                     {item.text}
                   </div>
                 ))}
@@ -105,7 +104,7 @@ export default function SwapPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: "Exchange Rate", value: "1 USDT = 1 AZR" },
-                  { label: "Network", value: "BNB Chain" },
+                  { label: "Settlement", value: "Instant" },
                 ].map((s) => (
                   <div key={s.label} className="rounded-ctl px-3 py-2.5" style={{ background: "rgba(45,212,191,0.06)", border: "1px solid rgba(45,212,191,0.15)" }}>
                     <div className="text-[11px] az-mono mb-1" style={{ color: "var(--muted)" }}>{s.label}</div>
@@ -125,7 +124,7 @@ export default function SwapPage() {
                   <span className="text-xs az-mono font-semibold">{fromLabel}</span>
                 </div>
                 <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>
-                  {t("balance")}: {fromBal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {t("balance")}: {fromBal.toFixed(4)}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -135,13 +134,13 @@ export default function SwapPage() {
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  disabled={txPending}
+                  disabled={pending}
                 />
                 <button
                   className="px-3 py-2 rounded-ctl text-xs font-semibold az-mono"
                   style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
-                  onClick={() => setAmount(fromBal.toFixed(2))}
-                  disabled={txPending}
+                  onClick={() => setAmount(fromBal.toFixed(4))}
+                  disabled={pending}
                 >
                   {t("max")}
                 </button>
@@ -150,10 +149,10 @@ export default function SwapPage() {
 
             <div className="flex justify-center my-4">
               <button
-                onClick={() => setDir(dir === "buy" ? "sell" : "buy")}
-                className="w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-200 hover:rotate-180 hover:border-teal"
+                onClick={() => { setDir(dir === "buy" ? "sell" : "buy"); setAmount(""); }}
+                className="w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-200 hover:border-teal"
                 style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}
-                disabled={txPending}
+                disabled={pending}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4" /></svg>
               </button>
@@ -168,23 +167,25 @@ export default function SwapPage() {
                 className="w-full rounded-ctl border px-4 py-3.5 az-mono text-lg"
                 style={{ background: "var(--bg-2)", borderColor: "var(--line)", color: "var(--text-2)" }}
               >
-                {amount && parseFloat(amount) > 0 ? parseFloat(amount).toFixed(2) : "0.00"}
+                {amount && parseFloat(amount) > 0 ? parseFloat(amount).toFixed(4) : "0.0000"}
               </div>
             </div>
 
             <p className="text-xs mb-5 text-center" style={{ color: "var(--muted)" }}>{t("rateNote")}</p>
 
-            {txPending && (
+            {pending && (
               <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-ctl mb-3" style={{ background: "rgba(45,212,191,0.08)", color: "var(--teal)" }}>
-                <Spinner size="sm" /> Waiting for blockchain confirmation…
+                <Spinner size="sm" /> Processing swap…
               </div>
             )}
 
-            <button className="az-btn-primary w-full" onClick={doSwap} disabled={txPending || !amount}>
-              {txPending ? (
-                <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span>
-              ) : t("swapBtn")}
+            <button className="az-btn-primary w-full" onClick={doSwap} disabled={pending || !amount || !addr}>
+              {pending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : t("swapBtn")}
             </button>
+
+            {!addr && (
+              <p className="text-xs mt-3 text-center" style={{ color: "var(--muted)" }}>Connect your wallet to swap.</p>
+            )}
           </div>
         </div>
       </div>

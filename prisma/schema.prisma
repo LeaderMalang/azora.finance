@@ -18,10 +18,14 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  stakes           Stake[]
-  withdrawals      Withdrawal[]
-  referralEarnings ReferralEarning[]
-  userCredit       UserCredit?
+  stakes              Stake[]
+  withdrawals         Withdrawal[]
+  referralEarnings    ReferralEarning[]
+  userCredit          UserCredit?
+  userBalance         UserBalance?
+  deposits            Deposit[]
+  virtualStakes       VirtualStake[]
+  virtualWithdrawals  VirtualWithdrawal[]
 }
 
 model Stake {
@@ -67,6 +71,57 @@ model UserCredit {
   user      User     @relation(fields: [userId], references: [id])
   balance   Float    @default(0)
   updatedAt DateTime @updatedAt
+}
+
+model UserBalance {
+  id          Int      @id @default(autoincrement())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  usdtBalance Float    @default(0)
+  azrBalance  Float    @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Deposit {
+  id          Int       @id @default(autoincrement())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  txHash      String    @unique
+  amount      Float
+  status      Int       @default(1) // 1=confirmed, 2=rejected
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+
+  @@index([userId])
+}
+
+model VirtualStake {
+  id            Int      @id @default(autoincrement())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  amount        Float
+  startTime     DateTime @default(now())
+  lastClaimTime DateTime @default(now())
+  unlockTime    DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model VirtualWithdrawal {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  amount     Float
+  assetType  Int      // 0=AZR, 1=USDT
+  toWallet   String
+  status     Int      @default(0) // 0=pending, 1=sent, 2=rejected
+  sentTxHash String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model ClaimHistory {

@@ -108,6 +108,8 @@ export default function AdminPage() {
   const [l3Input, setL3Input] = useState("");
   const [debitAmt, setDebitAmt] = useState("");
   const [debitAddr, setDebitAddr] = useState("");
+  const [debitBalance, setDebitBalance] = useState<number | null>(null);
+  const [debitLoading, setDebitLoading] = useState(false);
   const [creditAmt, setCreditAmt] = useState("");
   const [creditAddr, setCreditAddr] = useState("");
   const [withdrawId, setWithdrawId] = useState("");
@@ -115,26 +117,45 @@ export default function AdminPage() {
   const [seedReferrer, setSeedReferrer] = useState("");
   const [seedUsername, setSeedUsername] = useState("");
   const [seedLoading, setSeedLoading] = useState(false);
-  // Virtual credit/debit
-  const [vcWallet, setVcWallet] = useState("");
-  const [vcDelta, setVcDelta] = useState("");
-  const [vcBalance, setVcBalance] = useState<number | null>(null);
-  const [vcLoading, setVcLoading] = useState(false);
   // User lookup
   const [userQuery, setUserQuery] = useState("");
   const [userQueryLoading, setUserQueryLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [userResult, setUserResult] = useState<any>(null);
+  // Virtual withdrawal queue
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [vwList, setVwList] = useState<any[]>([]);
+  const [vwLoading, setVwLoading] = useState(false);
+  const [vwSentHash, setVwSentHash] = useState<Record<number, string>>({});
 
-  // Live staked balance for debit target
-  const { data: targetStaked } = useReadContract({
-    address: CONTRACTS[chainId].staking,
-    abi: STAKING_ABI,
-    functionName: "getTotalStaked",
-    args: isAddress(debitAddr) ? [debitAddr as `0x${string}`] : undefined,
-    query: { enabled: isAddress(debitAddr) },
+  const fetchVirtualWithdrawals = async () => {
+    setVwLoading(true);
+    try {
+      const res = await fetch("/api/admin/virtual-withdrawals?status=0");
+      if (res.ok) { const d = await res.json(); setVwList(d.withdrawals ?? []); }
+    } finally { setVwLoading(false); }
+  };
+
+  const handleVwAction = async (id: number, action: "send" | "reject") => {
+    const res = await fetch("/api/admin/withdrawal-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: id, action, sentTxHash: vwSentHash[id] || null }),
+    });
+    const d = await res.json();
+    if (!res.ok) { toast(d.error ?? "Failed", "error"); return; }
+    toast(action === "send" ? "Withdrawal marked as sent" : "Withdrawal rejected · balance refunded");
+    fetchVirtualWithdrawals();
+  };
+
+  // On-chain AZR balance for searched user
+  const { data: searchedAzrBal } = useReadContract({
+    address: CONTRACTS[chainId].azoraToken,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: userResult?.user?.walletAddress ? [userResult.user.walletAddress as `0x${string}`] : undefined,
+    query: { enabled: !!userResult?.user?.walletAddress },
   });
-  const targetStakedAmt = targetStaked ? parseFloat(formatUnits(targetStaked as bigint, 18)) : 0;
 
   const isOwner = !!addr && !!owner && addr.toLowerCase() === (owner as string).toLowerCase();
 
@@ -237,7 +258,11 @@ export default function AdminPage() {
                 {row("Username", `${u.username}.azr`)}
                 {row("Wallet", <span className="break-all">{u.walletAddress}</span>)}
                 {row("Joined", new Date(u.createdAt).toLocaleString())}
-                {row("Virtual Balance", <span style={{ color: (u.userCredit?.balance ?? 0) < 0 ? "#ef4444" : "var(--teal)" }}>{(u.userCredit?.balance ?? 0).toFixed(4)} AZR</span>)}
+                {row("AZR Wallet Balance", <span style={{ color: "var(--teal)" }}>{searchedAzrBal !== undefined ? parseFloat(formatUnits(searchedAzrBal as bigint, 18)).toFixed(4) : "loading…"} AZR</span>)}
+                {row("Total Active Staked", <span style={{ color: "var(--teal)" }}>{userResult.totalStaked?.toFixed(4) ?? "0.0000"} AZR</span>)}
+                {row("Total Commissions Earned", <span style={{ color: "var(--teal)" }}>{userResult.totalCommissions?.toFixed(4) ?? "0.0000"} AZR</span>)}
+                {row("Total Claims", <span style={{ color: "var(--teal)" }}>{userResult.totalClaims?.toFixed(4) ?? "0.0000"} AZR</span>)}
+                {row("Account Balance (Platform)", <span style={{ color: (u.userCredit?.balance ?? 0) < 0 ? "#ef4444" : "var(--teal)" }}>{(u.userCredit?.balance ?? 0).toFixed(4)} AZR</span>)}
 
                 {sectionHead("Referral Network")}
                 {row("Upline (Referrer)", u.referredByUser ? `${u.referredByUser.username}.azr (#${u.referredByUser.seqId})` : "None")}
@@ -453,40 +478,61 @@ export default function AdminPage() {
             )}
           </AdminCard>
 
-          {/* Debit account */}
-          <AdminCard title="Debit User Account">
-            <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>
-              Deducts AZR from a user&apos;s staked balance. The contract removes from the user&apos;s oldest active stake first, then continues to the next until the full amount is covered.
-            </p>
-            <p className="text-[11px] az-mono mb-3" style={{ color: "var(--muted)", opacity: 0.7 }}>
-              If the user has 3 positions (500, 300, 200 AZR) and you debit 600 AZR, position #1 is fully removed and 100 AZR is taken from position #2.
+          {/* Debit account (DB-tracked, affects available balance) */}
+          <AdminCard title="Debit Available Balance">
+            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+              Records a deduction from the user&apos;s account balance (DB only — does not affect staked tokens or wallet). Balance can go negative and is corrected by future credits or claims.
             </p>
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Wallet Address</label>
-                <input className="az-input" placeholder="0x..." value={debitAddr} onChange={(e) => setDebitAddr(e.target.value)} />
-                {isAddress(debitAddr) && (
-                  <p className="text-[11px] az-mono mt-1" style={{ color: "var(--muted)" }}>
-                    Total staked: <span style={{ color: "var(--teal)" }}>{targetStakedAmt.toFixed(4)} AZR</span>
+                <div className="flex gap-2">
+                  <input
+                    className="az-input flex-1"
+                    placeholder="0x..."
+                    value={debitAddr}
+                    onChange={(e) => { setDebitAddr(e.target.value); setDebitBalance(null); }}
+                  />
+                  <button
+                    className="px-3 rounded-ctl text-xs font-semibold"
+                    style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
+                    disabled={!isAddress(debitAddr)}
+                    onClick={async () => {
+                      const res = await fetch(`/api/admin/user-credit?wallet=${debitAddr}`);
+                      const d = await res.json();
+                      setDebitBalance(d.balance ?? 0);
+                    }}
+                  >Check</button>
+                </div>
+                {debitBalance !== null && (
+                  <p className="text-[11px] az-mono mt-1" style={{ color: debitBalance < 0 ? "#ef4444" : "var(--teal)" }}>
+                    Current balance: <strong>{debitBalance.toFixed(4)} AZR</strong>
                   </p>
                 )}
               </div>
               <div>
-                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (AZR)</label>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount to Debit (AZR)</label>
                 <input className="az-input" placeholder="0.00" value={debitAmt} onChange={(e) => setDebitAmt(e.target.value)} type="number" />
-                {isAddress(debitAddr) && debitAmt && parseFloat(debitAmt) > targetStakedAmt && (
-                  <p className="text-[11px] az-mono mt-1" style={{ color: "#ef4444" }}>Exceeds staked balance</p>
-                )}
               </div>
               <button
                 className="az-btn-primary w-full"
                 style={{ background: "rgba(239,68,68,0.15)", borderColor: "#ef4444", color: "#ef4444" }}
-                disabled={txPending || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") > targetStakedAmt || targetStakedAmt === 0}
-                onClick={() => exec(
-                  () => writeContractAsync({ address: CONTRACTS[chainId].staking, abi: STAKING_ABI, functionName: "debitAccount", args: [debitAddr as `0x${string}`, parseUnits(debitAmt, 18)] }),
-                  `Debited ${debitAmt} AZR from ${debitAddr.slice(0, 8)}…`,
-                )}
-              >{txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Debit Account"}</button>
+                disabled={debitLoading || !debitAmt || !isAddress(debitAddr) || parseFloat(debitAmt || "0") <= 0}
+                onClick={async () => {
+                  setDebitLoading(true);
+                  try {
+                    const res = await fetch("/api/admin/user-credit", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ wallet: debitAddr, delta: -Math.abs(Number(debitAmt)) }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) { toast(d.error ?? "Failed", "error"); }
+                    else { toast(`Debited ${debitAmt} AZR · new balance: ${d.balance.toFixed(4)}`); setDebitBalance(d.balance); setDebitAmt(""); }
+                  } catch { toast("Network error", "error"); }
+                  finally { setDebitLoading(false); }
+                }}
+              >{debitLoading ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Debit Account"}</button>
             </div>
           </AdminCard>
 
@@ -521,64 +567,6 @@ export default function AdminPage() {
                   `Sent ${creditAmt} AZR to ${creditAddr.slice(0, 8)}…`,
                 )}
               >{txPending ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : "Credit Wallet"}</button>
-            </div>
-          </AdminCard>
-
-          {/* Virtual account credit / debit */}
-          <AdminCard title="Virtual Account Balance">
-            <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-              Adjust a user&apos;s virtual account balance (DB only, no on-chain transaction). Enter a positive amount to credit, negative to debit. Balance can go negative and is corrected by future claims or deposits.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Wallet Address</label>
-                <div className="flex gap-2">
-                  <input
-                    className="az-input flex-1"
-                    placeholder="0x..."
-                    value={vcWallet}
-                    onChange={(e) => { setVcWallet(e.target.value); setVcBalance(null); }}
-                  />
-                  <button
-                    className="px-3 rounded-ctl text-xs font-semibold"
-                    style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
-                    disabled={!isAddress(vcWallet)}
-                    onClick={async () => {
-                      const res = await fetch(`/api/admin/user-credit?wallet=${vcWallet}`);
-                      const d = await res.json();
-                      setVcBalance(d.balance ?? 0);
-                    }}
-                  >Check</button>
-                </div>
-                {vcBalance !== null && (
-                  <p className="text-[11px] az-mono mt-1" style={{ color: vcBalance < 0 ? "#ef4444" : "var(--teal)" }}>
-                    Current balance: <strong>{vcBalance.toFixed(4)} AZR</strong>
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Amount (positive = credit, negative = debit)</label>
-                <input className="az-input" placeholder="e.g. 50 or -50" type="number" value={vcDelta} onChange={(e) => setVcDelta(e.target.value)} />
-              </div>
-              <button
-                className="az-btn-primary w-full"
-                style={Number(vcDelta) < 0 ? { background: "rgba(239,68,68,0.15)", borderColor: "#ef4444", color: "#ef4444" } : {}}
-                disabled={vcLoading || !vcDelta || !isAddress(vcWallet)}
-                onClick={async () => {
-                  setVcLoading(true);
-                  try {
-                    const res = await fetch("/api/admin/user-credit", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ wallet: vcWallet, delta: Number(vcDelta) }),
-                    });
-                    const d = await res.json();
-                    if (!res.ok) { toast(d.error ?? "Failed", "error"); }
-                    else { toast(`Balance updated: ${d.balance.toFixed(4)} AZR`); setVcBalance(d.balance); setVcDelta(""); }
-                  } catch { toast("Network error", "error"); }
-                  finally { setVcLoading(false); }
-                }}
-              >{vcLoading ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : (Number(vcDelta) < 0 ? "Debit Account" : "Credit Account")}</button>
             </div>
           </AdminCard>
 
@@ -673,6 +661,40 @@ export default function AdminPage() {
           </AdminCard>
 
         </div>
+
+        {/* Virtual withdrawal queue */}
+        <AdminCard title="Virtual Withdrawal Queue">
+          <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
+            Pending withdrawals from the virtual balance system. Send the real tokens from your treasury wallet, paste the TX hash, and mark as sent. Balance is already deducted on submission — reject to refund.
+          </p>
+          <button className="az-btn-primary text-xs px-3 py-1.5 mb-4" onClick={fetchVirtualWithdrawals} disabled={vwLoading}>
+            {vwLoading ? <Spinner size="sm" /> : "Refresh"}
+          </button>
+          {vwList.length === 0 ? (
+            <p className="text-xs py-4 text-center" style={{ color: "var(--text-2)" }}>No pending virtual withdrawals.</p>
+          ) : (
+            <div className="space-y-3">
+              {vwList.map((w) => (
+                <div key={w.id} className="rounded-ctl p-3" style={{ background: "var(--bg-2)", border: "1px solid var(--line)" }}>
+                  <div className="flex flex-wrap justify-between gap-2 mb-2 text-xs">
+                    <span className="az-mono font-semibold">#{w.id} · {w.user?.username}.azr · {w.amount.toFixed(4)} {w.assetType === 0 ? "AZR" : "USDT"}</span>
+                    <span className="az-mono" style={{ color: "var(--muted)" }}>To: {w.toWallet.slice(0,8)}…{w.toWallet.slice(-4)}</span>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      className="az-input h-7 text-xs flex-1"
+                      placeholder="TX hash (optional)"
+                      value={vwSentHash[w.id] ?? ""}
+                      onChange={(e) => setVwSentHash((p) => ({ ...p, [w.id]: e.target.value }))}
+                    />
+                    <button className="az-btn-primary text-xs px-3 py-1" onClick={() => handleVwAction(w.id, "send")}>Mark Sent</button>
+                    <button className="text-xs px-3 py-1 rounded-ctl" style={{ border: "1px solid #ef4444", color: "#ef4444", background: "rgba(239,68,68,0.07)" }} onClick={() => handleVwAction(w.id, "reject")}>Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </AdminCard>
 
         {/* All withdrawal requests table */}
         <AdminCard title="All Withdrawal Requests">

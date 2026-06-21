@@ -40,5 +40,8 @@ export async function GET(req: NextRequest) {
   const totalCommissions = user.referralEarnings
     .reduce((sum, e) => sum + parseFloat(e.amount) / 1e18, 0);
 
-  return NextResponse.json({ user, claimHistory, totalStaked, totalCommissions });
+  const totalClaims = claimHistory
+    .reduce((sum, c) => sum + parseFloat(c.amount) / 1e18, 0);
+
+  return NextResponse.json({ user, claimHistory, totalStaked, totalCommissions, totalClaims });
 }
