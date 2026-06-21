@@ -81,8 +81,8 @@ export default function DepositPage() {
         {addr && (
           <div className="grid grid-cols-2 gap-4">
             {[
-              { label: "Virtual USDT", value: balance.usdtBalance.toFixed(4), symbol: "USDT" as const },
-              { label: "Virtual AZR",  value: balance.azrBalance.toFixed(4),  symbol: "AZR"  as const },
+              { label: "USDT", value: balance.usdtBalance.toFixed(4), symbol: "USDT" as const },
+              { label: "AZR", value: balance.azrBalance.toFixed(4), symbol: "AZR" as const },
             ].map((b) => (
               <div key={b.symbol} className="az-card text-center">
                 <div className="text-[11px] az-mono mb-2" style={{ color: "var(--muted)" }}>{b.label}</div>
@@ -135,7 +135,7 @@ export default function DepositPage() {
         <div className="az-card">
           <h3 className="font-semibold mb-4">Step 2 — Submit Your Transaction Hash</h3>
           <p className="text-xs mb-4" style={{ color: "var(--text-2)" }}>
-            After your USDT transfer is confirmed on BSC (usually 15–30 seconds), paste the transaction hash below. The system will verify it on-chain automatically and credit your virtual USDT balance.
+            After your USDT transfer is confirmed on BSC (usually 15–30 seconds), paste the transaction hash below. The system will verify it on-chain automatically and credit your USDT balance.
           </p>
           {!addr ? (
             <p className="text-sm py-4 text-center" style={{ color: "var(--text-2)" }}>Connect your wallet to submit a deposit.</p>
