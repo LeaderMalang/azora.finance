@@ -9,7 +9,7 @@
   "hero": {
     "eyebrow": "BNB Smart Chain · Decentralized Staking",
     "headline": "Stake AZR.\nEarn Every Day.",
-    "sub": "Azora's smart contracts handle every swap, monitor every stake, and distribute every reward — automatically, around the clock. You earn 0.7% daily while the protocol does the rest.",
+    "sub": "Azora's AI-driven smart contracts handle every swap, monitor every stake, and distribute every reward automatically, around the clock. Powered by intelligent automation, the protocol works tirelessly so you don't have to. Earn 0.7% daily while AI manages the rest.",
     "cta1": "Start Earning",
     "cta2": "How It Works",
     "trust1": "On-Chain Security",
@@ -47,7 +47,7 @@
     "f1Title": "On-Chain Security",
     "f1Desc": "Every interaction is governed by auditable smart contracts on BNB Smart Chain — transparent, immutable, and running without any central intermediary.",
     "f2Title": "3-Level Referral System",
-    "f2Desc": "Azora traces 3-level referral chains on-chain and distributes 5% / 3% / 2% commissions the moment a stake is confirmed.",
+    "f2Desc": "Azora traces 3-level referral chains on-chain and distributes 5% / 2% / 1% commissions the moment a stake is confirmed.",
     "f3Title": "Managed Withdrawals",
     "f3Desc": "Withdrawal requests enter a secure queue reviewed by Azora administrators before processing, adding an extra layer of protection against unauthorised payouts.",
     "f4Title": "Multi-Wallet Support",
@@ -74,7 +74,7 @@
     "q3": "What happens during my 150-day lock period?",
     "a3": "The smart contract monitors your stake and accrues rewards every second during the lock. You can claim rewards at any time. Unstaking the principal is only available after 150 days — enforced automatically by the contract.",
     "q4": "How do referral commissions work?",
-    "a4": "When someone stakes using your referral link, Azora traces the 3-level chain on-chain and distributes commissions instantly: 5% to you (L1), 3% to your referrer (L2), 2% to the next level (L3). Paid from the reward pool in real time.",
+    "a4": "When someone stakes using your referral link, Azora traces the 3-level chain on-chain and distributes commissions instantly: 5% to you (L1), 2% to your referrer (L2), 1% to the next level (L3). Paid from the reward pool in real time.",
     "q5": "How does the withdrawal process work?",
     "a5": "Withdrawal requests enter a secure admin review queue. A fee applies (shown before you submit). Once approved, funds are released to your wallet. This review step ensures only legitimate requests are processed.",
     "q6": "How do I get AZR to stake?",
@@ -87,12 +87,12 @@
   },
   "footer": {
     "tagline": "Decentralized staking. 0.7% every day.",
-    "disclaimer": "AZR is not a stablecoin. Its value fluctuates based on market conditions. Staking involves risk. This is not financial advice. Always do your own research.",
+    "disclaimer": "AZR Token is the native BEP-20 utility and staking token of the Azora protocol.",
     "links": "Quick Links",
     "community": "Community",
     "contract": "Contract",
     "bscScan": "BscScan",
-    "rights": "© 2025 Azora. All rights reserved."
+    "rights": "© 2026 Azora. All rights reserved."
   },
   "app": {
     "dashboard": "Dashboard",

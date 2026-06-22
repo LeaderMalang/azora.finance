@@ -8,6 +8,12 @@ import { useActiveChain } from "@/lib/hooks";
 import { formatUnits, isAddress } from "viem";
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { useAppStore } from "@/lib/store";
+import Link from "next/link";
+import { AdminPaginator } from "@/components/ui/AdminPaginator";
+import { useParams } from "next/navigation";
+
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
 
 function AdminCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -22,9 +28,11 @@ export default function AdminPage() {
   const { address: addr } = useAccount();
   const { toast } = useToast();
   const { chainId } = useActiveChain();
+  const { locale } = useParams<{ locale: string }>();
 
-  // Wallet-based admin check (DB-driven, supports multiple admin wallets)
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = loading
+  // Admin status from Zustand store (set by layout.tsx on wallet connect)
+  const isAdminStore = useAppStore((s) => s.isAdmin);
+  const [isAdmin, setIsAdminLocal] = useState<boolean | null>(null); // null = still loading
   // Pool AZR balance (platform overview)
   const { data: poolAzrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: [CONTRACTS[chainId].staking], query: { enabled: true } });
 
@@ -32,14 +40,16 @@ export default function AdminPage() {
   const adminFetch = (url: string, opts: RequestInit = {}) =>
     fetch(url, { ...opts, headers: { ...(opts.headers ?? {}), "x-admin-wallet": addr ?? "" } });
 
-  // Check if connected wallet is admin
+  // Sync local state from store (layout already did the DB check)
+  // Also do an independent check so admin page works even if layout check was slow
   useEffect(() => {
-    if (!addr) { setIsAdmin(null); return; }
+    if (!addr) { setIsAdminLocal(null); return; }
+    if (isAdminStore) { setIsAdminLocal(true); return; }
     fetch(`/api/admin/auth?wallet=${addr}`)
       .then(r => r.json())
-      .then(d => setIsAdmin(!!d.isAdmin))
-      .catch(() => setIsAdmin(false));
-  }, [addr]);
+      .then(d => setIsAdminLocal(!!d.isAdmin))
+      .catch(() => setIsAdminLocal(false));
+  }, [addr, isAdminStore]);
 
   // DB stats
   const [dbStats, setDbStats] = useState<{ userCount: number; referralTotal: string } | null>(null);
@@ -71,7 +81,9 @@ export default function AdminPage() {
   const [adjBal, setAdjBal] = useState<{ usdtBalance: number; azrBalance: number; username?: string } | null>(null);
   const [adjLoading, setAdjLoading] = useState(false);
   // Platform Settings
-  const [settings, setSettings] = useState<{ minStakeAzr: number; lockDays: number; dailyRewardPct: number; minWithdrawal: number; withdrawalFeePct: number; referralRateL1: number; referralRateL2: number; referralRateL3: number } | null>(null);
+  const [settings, setSettings] = useState<{ minStakeAzr: number; lockDays: number; dailyRewardPct: number; minWithdrawal: number; withdrawalFeePct: number; referralRateL1: number; referralRateL2: number; referralRateL3: number; treasuryWallet: string } | null>(null);
+  const [newTreasuryWallet, setNewTreasuryWallet] = useState("");
+  const [treasuryLoading, setTreasuryLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [seedWallet, setSeedWallet] = useState("");
   const [seedReferrer, setSeedReferrer] = useState("");
@@ -82,11 +94,33 @@ export default function AdminPage() {
   const [userQueryLoading, setUserQueryLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [userResult, setUserResult] = useState<any>(null);
-  // Virtual withdrawal queue
+  // Virtual withdrawal queue — with filters + search
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [vwList, setVwList] = useState<any[]>([]);
   const [vwLoading, setVwLoading] = useState(false);
   const [vwSentHash, setVwSentHash] = useState<Record<number, string>>({});
+  const [vwSearch, setVwSearch] = useState("");
+  const [vwStatusFilter, setVwStatusFilter] = useState("-1");
+  const [vwAssetFilter, setVwAssetFilter] = useState("-1");
+  // Balance adjustments history
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [baList, setBaList] = useState<any[]>([]);
+  const [baTotal, setBaTotal] = useState(0);
+  const [baLoading, setBaLoading] = useState(false);
+  const [baSearch, setBaSearch] = useState("");
+  const [baAsset, setBaAsset] = useState("");
+  const [baAction, setBaAction] = useState("");
+  // Users list for lookup
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ulList, setUlList] = useState<any[]>([]);
+  const [ulTotal, setUlTotal] = useState(0);
+  const [ulLoading, setUlLoading] = useState(false);
+  const [ulSearch, setUlSearch] = useState("");
+  const [ulHasUpline, setUlHasUpline] = useState("");
+  // Compact card pagination (10 per page, client-side slice)
+  const [vwCardPage, setVwCardPage] = useState(1);
+  const [baCardPage, setBaCardPage] = useState(1);
+  const [ulCardPage, setUlCardPage] = useState(1);
   // DB sync
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [syncCounts, setSyncCounts] = useState<any>(null);
@@ -95,12 +129,39 @@ export default function AdminPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [syncResult, setSyncResult] = useState<any>(null);
 
-  const fetchVirtualWithdrawals = async () => {
+  const fetchVirtualWithdrawals = async (statusF = vwStatusFilter) => {
     setVwLoading(true);
     try {
-      const res = await adminFetch("/api/admin/virtual-withdrawals");
+      const params = new URLSearchParams();
+      if (statusF !== "-1") params.set("status", statusF);
+      const res = await adminFetch(`/api/admin/virtual-withdrawals?${params}`);
       if (res.ok) { const d = await res.json(); setVwList(d.withdrawals ?? []); }
     } finally { setVwLoading(false); }
+  };
+
+  const fetchBalanceAdjustments = async (search = baSearch, asset = baAsset, action = baAction) => {
+    setBaLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (asset)  params.set("asset", asset);
+      if (action) params.set("action", action);
+      params.set("limit", "50");
+      const res = await adminFetch(`/api/admin/balance-adjustments?${params}`);
+      if (res.ok) { const d = await res.json(); setBaList(d.adjustments ?? []); setBaTotal(d.total ?? 0); }
+    } finally { setBaLoading(false); }
+  };
+
+  const fetchUsersList = async (search = ulSearch, hasUpline = ulHasUpline) => {
+    setUlLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search)    params.set("search", search);
+      if (hasUpline) params.set("hasUpline", hasUpline);
+      params.set("limit", "50");
+      const res = await adminFetch(`/api/admin/users-list?${params}`);
+      if (res.ok) { const d = await res.json(); setUlList(d.users ?? []); setUlTotal(d.total ?? 0); }
+    } finally { setUlLoading(false); }
   };
 
   const handleVwAction = async (id: number, action: "send" | "reject") => {
@@ -117,11 +178,13 @@ export default function AdminPage() {
 
   // searchedAzrBal removed — user data now shows virtual balance from DB
 
-  // Load platform settings and withdrawal queue when admin is confirmed
+  // Load all data when admin is confirmed
   useEffect(() => {
     if (!isAdmin || !addr) return;
     adminFetch("/api/admin/settings").then(r => r.json()).then(d => { if (!d.error) setSettings(d); }).catch(() => {});
-    fetchVirtualWithdrawals();
+    fetchVirtualWithdrawals("-1");
+    fetchBalanceAdjustments("", "", "");
+    fetchUsersList("", "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, addr]);
 
@@ -166,30 +229,95 @@ export default function AdminPage() {
     );
   }
 
-  const fmt = (v: bigint | undefined, decimals = 18, dp = 2) =>
-    v !== undefined ? parseFloat(formatUnits(v, decimals)).toFixed(dp) : "—";
+  // Normalize large numbers: 1.23B, 456.7M, 12.3K
+  const fmtNum = (n: number): string => {
+    if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
+    if (n >= 1_000_000)     return (n / 1_000_000).toFixed(2) + "M";
+    if (n >= 1_000)         return (n / 1_000).toFixed(2) + "K";
+    return n.toFixed(4);
+  };
 
   return (
     <>
-      <AppTopbar title="Admin Panel" sub="Owner-only contract controls · handle with care" />
+      <AppTopbar title="Admin Panel" sub="Admin controls · custodial system" />
       <div className="p-4 md:p-8 max-w-app space-y-6">
 
         {/* User Data Lookup */}
+        {/* Users List + Detail Lookup */}
         <AdminCard title="User Data Lookup">
-          <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>Search by wallet address or username to view all data for a user.</p>
-          <div className="flex gap-2 mb-4">
-            <input
-              className="az-input flex-1"
-              placeholder="0x... or username"
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && userQuery) { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); } }}
-            />
-            <button
-              className="az-btn-primary px-4"
-              disabled={userQueryLoading || !userQuery}
-              onClick={() => { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); }}
-            >{userQueryLoading ? <Spinner size="sm" /> : "Search"}</button>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs" style={{ color: "var(--muted)" }}>Search and paginate all registered users</p>
+            <Link href={`/${locale}/app/admin/users`} className="text-xs az-mono font-semibold" style={{ color: "var(--teal)" }}>View all →</Link>
+          </div>
+          {/* Search & Filters */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            <input className="az-input flex-1 min-w-[160px]" placeholder="Search wallet or username…"
+              value={ulSearch} onChange={e => { setUlSearch(e.target.value); }}
+              onKeyDown={e => e.key === "Enter" && fetchUsersList(ulSearch, ulHasUpline)} />
+            <select className="rounded-ctl px-3 py-2 text-xs az-mono" style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={ulHasUpline} onChange={e => { setUlHasUpline(e.target.value); fetchUsersList(ulSearch, e.target.value); }}>
+              <option value="">All Users</option>
+              <option value="yes">Has Upline</option>
+              <option value="no">No Upline</option>
+            </select>
+            <button className="az-btn-primary px-4 text-sm" disabled={ulLoading} onClick={() => fetchUsersList(ulSearch, ulHasUpline)}>
+              {ulLoading ? <Spinner size="sm" /> : "Search"}
+            </button>
+          </div>
+          {/* Users Table */}
+          {ulList.length > 0 && (
+            <div className="overflow-x-auto mb-4">
+              <p className="text-[11px] az-mono mb-2" style={{ color: "var(--muted)" }}>Showing {Math.min(ulCardPage * 10, ulList.length)} of {ulTotal} users</p>
+              <table className="w-full text-xs">
+                <thead><tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                  <th className="text-left pb-2 font-normal">#</th>
+                  <th className="text-left pb-2 font-normal">Username</th>
+                  <th className="text-left pb-2 font-normal">Wallet</th>
+                  <th className="text-left pb-2 font-normal">USDT</th>
+                  <th className="text-left pb-2 font-normal">AZR</th>
+                  <th className="text-left pb-2 font-normal">Upline</th>
+                  <th className="text-left pb-2 font-normal">Stakes</th>
+                  <th className="text-left pb-2 font-normal">Action</th>
+                </tr></thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {ulList.slice((ulCardPage - 1) * 10, ulCardPage * 10).map((u: {seqId: number; username: string; walletAddress: string; userBalance: {usdtBalance: number; azrBalance: number} | null; referredByUser: {username: string; seqId: number} | null; _count: {virtualStakes: number; referrals: number}; createdAt: string}) => (
+                    <tr key={u.seqId}>
+                      <td className="py-1.5 az-mono" style={{ color: "var(--muted)" }}>#{u.seqId}</td>
+                      <td className="py-1.5 az-mono font-semibold" style={{ color: "var(--teal)" }}>{u.username}.azr</td>
+                      <td className="py-1.5 az-mono" style={{ color: "var(--muted)" }}>{u.walletAddress.slice(0,8)}…{u.walletAddress.slice(-4)}</td>
+                      <td className="py-1.5 az-mono">{(u.userBalance?.usdtBalance ?? 0).toFixed(2)}</td>
+                      <td className="py-1.5 az-mono">{(u.userBalance?.azrBalance ?? 0).toFixed(2)}</td>
+                      <td className="py-1.5" style={{ color: "var(--muted)" }}>{u.referredByUser ? `${u.referredByUser.username} (#${u.referredByUser.seqId})` : "—"}</td>
+                      <td className="py-1.5 az-mono">{u._count.virtualStakes}</td>
+                      <td className="py-1.5">
+                        <button className="text-[11px] px-2 py-0.5 rounded-ctl" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
+                          onClick={() => { setUserQuery(u.walletAddress); setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${u.walletAddress}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); }}>
+                          Detail
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {ulList.length > 0 && (
+            <AdminPaginator page={ulCardPage} totalPages={Math.max(1, Math.ceil(ulList.length / 10))} total={ulList.length} pageSize={10}
+              onFirst={() => setUlCardPage(1)} onPrev={() => setUlCardPage(p => p-1)} onNext={() => setUlCardPage(p => p+1)} onLast={() => setUlCardPage(Math.max(1, Math.ceil(ulList.length / 10)))} />
+          )}
+          {/* Detail Lookup */}
+          <div style={{ borderTop: ulList.length > 0 ? "1px solid var(--line)" : undefined, paddingTop: ulList.length > 0 ? "1rem" : undefined }}>
+            <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>User Detail — search by exact wallet or username:</p>
+            <div className="flex gap-2 mb-4">
+              <input className="az-input flex-1" placeholder="0x... or username"
+                value={userQuery} onChange={e => setUserQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && userQuery) { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => setUserResult(d)).finally(() => setUserQueryLoading(false)); } }}
+              />
+              <button className="az-btn-primary px-4" disabled={userQueryLoading || !userQuery}
+                onClick={() => { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => setUserResult(d)).finally(() => setUserQueryLoading(false)); }}>
+                {userQueryLoading ? <Spinner size="sm" /> : "Lookup"}
+              </button>
+            </div>
           </div>
           {userResult?.error && <p className="text-sm" style={{ color: "#ef4444" }}>{userResult.error}</p>}
           {userResult?.user && (() => {
@@ -273,17 +401,17 @@ export default function AdminPage() {
           })()}
         </AdminCard>
 
-        {/* Stats overview — custodial DB stats */}
+        {/* Stats overview — all values from DB except AZR Contract Pool (on-chain) */}
         <div className="az-card-glow">
           <h3 className="font-semibold mb-4 text-sm">Platform Overview</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: "AZR Contract Pool", value: fmt(poolAzrBal as bigint | undefined), unit: "AZR", color: "var(--teal)" },
-              { label: "Total Users", value: dbStats ? String(dbStats.userCount) : "…", unit: "", color: "var(--text)" },
-              { label: "Referral Paid", value: dbStats ? dbStats.referralTotal : "…", unit: "AZR", color: "var(--text)" },
-              { label: "Pending W/D", value: String(vwList.filter(w => w.status === 0).length), unit: "virtual", color: vwList.filter(w => w.status === 0).length > 0 ? "var(--warn)" : "var(--text)" },
-              { label: "Settings", value: settings ? `${settings.dailyRewardPct}% / day` : "…", unit: "", color: "var(--teal)" },
-              { label: "Ref Rates", value: settings ? `L1:${settings.referralRateL1}%` : "…", unit: "", color: "var(--text)" },
+              { label: "AZR Contract Pool ⛓", value: fmtNum(poolAzrBal ? parseFloat(formatUnits(poolAzrBal as bigint, 18)) : 0), unit: "AZR", color: "var(--teal)" },
+              { label: "Total Users 🗄", value: dbStats ? String(dbStats.userCount) : "…", unit: "", color: "var(--text)" },
+              { label: "Referral Paid 🗄", value: dbStats ? fmtNum(parseFloat(dbStats.referralTotal)) : "…", unit: "AZR", color: "var(--text)" },
+              { label: "Pending W/D 🗄", value: String(vwList.filter(w => w.status === 0).length), unit: "requests", color: vwList.filter(w => w.status === 0).length > 0 ? "var(--warn)" : "var(--text)" },
+              { label: "Daily Rate 🗄", value: settings ? `${settings.dailyRewardPct}%` : "…", unit: "/ day", color: "var(--teal)" },
+              { label: "Ref Rates 🗄", value: settings ? `${settings.referralRateL1}/${settings.referralRateL2}/${settings.referralRateL3}%` : "…", unit: "L1/L2/L3", color: "var(--text)" },
             ].map((s) => (
               <div key={s.label} className="rounded-ctl px-3 py-3 text-center" style={{ background: "var(--bg-2)" }}>
                 <div className="text-[10px] az-mono mb-1" style={{ color: "var(--muted)" }}>{s.label}</div>
@@ -380,6 +508,78 @@ export default function AdminPage() {
             </div>
           </AdminCard>
 
+          {/* Treasury Wallet */}
+          <AdminCard title="Treasury Wallet">
+            <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
+              The BSC wallet address users send USDT deposits to. Changing this takes effect immediately for all new deposits.
+            </p>
+            {/* Current wallet display */}
+            <div className="mb-4">
+              <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>Current Treasury Wallet</label>
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 rounded-ctl px-3 py-2.5 text-sm az-mono break-all"
+                  style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--teal)" }}>
+                  {settings?.treasuryWallet || process.env.NEXT_PUBLIC_TREASURY_WALLET || "Not configured"}
+                </div>
+                <button
+                  className="px-3 py-2.5 rounded-ctl text-xs font-semibold flex-shrink-0"
+                  style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
+                  onClick={() => {
+                    const w = settings?.treasuryWallet || "";
+                    if (w) { navigator.clipboard.writeText(w); toast("Copied!"); }
+                  }}
+                >Copy</button>
+              </div>
+            </div>
+            {/* Change wallet */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] az-mono mb-1 block" style={{ color: "var(--muted)" }}>New Treasury Wallet Address (BEP-20 / BSC)</label>
+                <input
+                  className="az-input"
+                  placeholder="0x..."
+                  value={newTreasuryWallet}
+                  onChange={(e) => setNewTreasuryWallet(e.target.value)}
+                />
+                {newTreasuryWallet && !newTreasuryWallet.startsWith("0x") && (
+                  <p className="text-[10px] mt-0.5" style={{ color: "#ef4444" }}>Must start with 0x</p>
+                )}
+                {newTreasuryWallet && newTreasuryWallet.length !== 42 && newTreasuryWallet.startsWith("0x") && (
+                  <p className="text-[10px] mt-0.5" style={{ color: "#ef4444" }}>Must be 42 characters (0x + 40 hex)</p>
+                )}
+                {newTreasuryWallet && newTreasuryWallet.length === 42 && newTreasuryWallet.startsWith("0x") && (
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--teal)" }}>✓ Valid BSC address format</p>
+                )}
+              </div>
+              <button
+                className="az-btn-primary w-full"
+                style={{ background: "rgba(239,68,68,0.15)", borderColor: "#ef4444", color: "#ef4444" }}
+                disabled={treasuryLoading || !newTreasuryWallet || newTreasuryWallet.length !== 42 || !newTreasuryWallet.startsWith("0x")}
+                onClick={async () => {
+                  setTreasuryLoading(true);
+                  try {
+                    const res = await adminFetch("/api/admin/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ treasuryWallet: newTreasuryWallet }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) { toast(d.error ?? "Failed", "error"); }
+                    else {
+                      toast("Treasury wallet updated — new deposits will verify against this address");
+                      if (d.settings) setSettings(d.settings);
+                      setNewTreasuryWallet("");
+                    }
+                  } catch { toast("Network error", "error"); }
+                  finally { setTreasuryLoading(false); }
+                }}
+              >{treasuryLoading ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Saving…</span> : "Update Treasury Wallet"}</button>
+              <div className="rounded-ctl px-3 py-2 text-[11px] az-mono" style={{ background: "rgba(243,186,47,0.06)", color: "#f3ba2f", border: "1px solid rgba(243,186,47,0.2)" }}>
+                ⚠ Only change this if you are moving to a new treasury wallet. Users must send USDT to the new address for deposits to be credited.
+              </div>
+            </div>
+          </AdminCard>
+
           {/* Platform Settings */}
           <AdminCard title="Platform Settings">
             <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
@@ -438,9 +638,13 @@ export default function AdminPage() {
             <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
               Manage wallets that have admin access. Only active admins can add or remove wallets. You cannot remove your own wallet.
             </p>
-            <button className="az-btn-primary text-xs px-3 py-1.5 mb-4" onClick={() => { fetchAdminWallets(); }} disabled={adminWalletsLoading}>
-              {adminWalletsLoading ? <Spinner size="sm" /> : "Load Admin Wallets"}
-            </button>
+            <div className="flex gap-2 mb-4">
+              <input className="az-input flex-1 h-8 text-sm" placeholder="Filter by wallet or label…"
+                id="aw-search" />
+              <button className="az-btn-primary text-xs px-3 py-1.5" onClick={() => { fetchAdminWallets(); }} disabled={adminWalletsLoading}>
+                {adminWalletsLoading ? <Spinner size="sm" /> : "Refresh"}
+              </button>
+            </div>
             {adminWallets.length > 0 && (
               <div className="space-y-2 mb-4">
                 {adminWallets.map((w) => (
@@ -618,47 +822,167 @@ export default function AdminPage() {
 
         {/* Virtual withdrawal queue — auto-loads on mount, shows all withdrawals */}
         <AdminCard title="Withdrawal Queue">
-          <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
-            All virtual withdrawal requests. For pending ones: send tokens from your treasury wallet, paste the TX hash, and mark as sent. Reject refunds the user automatically.
-          </p>
-          <div className="flex gap-2 mb-4">
-            <button className="az-btn-primary text-xs px-3 py-1.5" onClick={fetchVirtualWithdrawals} disabled={vwLoading}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs" style={{ color: "var(--muted)" }}>All virtual withdrawal requests</p>
+            <Link href={`/${locale}/app/admin/withdrawals`} className="text-xs az-mono font-semibold" style={{ color: "var(--teal)" }}>View all →</Link>
+          </div>
+          {/* Filters + Search */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <input className="az-input flex-1 min-w-[160px] h-8 text-sm" placeholder="Search username or wallet…"
+              value={vwSearch} onChange={e => setVwSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && fetchVirtualWithdrawals(vwStatusFilter)} />
+            <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={vwStatusFilter} onChange={e => { setVwStatusFilter(e.target.value); fetchVirtualWithdrawals(e.target.value); }}>
+              <option value="-1">All Status</option>
+              <option value="0">Pending</option>
+              <option value="1">Sent</option>
+              <option value="2">Rejected</option>
+              <option value="3">Cancelled</option>
+            </select>
+            <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={vwAssetFilter} onChange={e => { setVwAssetFilter(e.target.value); fetchVirtualWithdrawals(vwStatusFilter); }}>
+              <option value="-1">All Assets</option>
+              <option value="0">AZR</option>
+              <option value="1">USDT</option>
+            </select>
+            <button className="az-btn-primary text-xs px-3 py-1.5" onClick={() => fetchVirtualWithdrawals(vwStatusFilter)} disabled={vwLoading}>
               {vwLoading ? <Spinner size="sm" /> : "Refresh"}
             </button>
           </div>
+          {/* Table */}
           {vwList.length === 0 ? (
-            <p className="text-xs py-4 text-center" style={{ color: "var(--text-2)" }}>No pending withdrawals.</p>
+            <p className="text-xs py-6 text-center" style={{ color: "var(--text-2)" }}>No withdrawals found.</p>
           ) : (
-            <div className="space-y-3">
-              {vwList.map((w) => (
-                <div key={w.id} className="rounded-ctl p-3" style={{ background: "var(--bg-2)", border: "1px solid var(--line)" }}>
-                  <div className="flex flex-wrap justify-between gap-2 mb-1 text-xs">
-                    <span className="az-mono font-semibold">#{w.id} · {w.user?.username ?? w.user?.walletAddress?.slice(0,8)}.azr</span>
-                    <span className="az-mono font-bold" style={{ color: "var(--teal)" }}>{w.amount.toFixed(4)} {w.assetType === 0 ? "AZR" : "USDT"}</span>
-                  </div>
-                  <div className="text-[11px] az-mono mb-2" style={{ color: "var(--muted)" }}>
-                    To: {w.toWallet} · {new Date(w.createdAt).toLocaleDateString()}
-                    {" · "}<span style={{ color: w.status === 0 ? "var(--warn)" : w.status === 1 ? "var(--teal)" : "#ef4444" }}>{["Pending","Sent","Rejected"][w.status]}</span>
-                  </div>
-                  {w.status === 0 && (
-                    <div className="flex gap-2 items-center">
-                      <input
-                        className="az-input h-7 text-xs flex-1"
-                        placeholder="TX hash (optional)"
-                        value={vwSentHash[w.id] ?? ""}
-                        onChange={(e) => setVwSentHash((p) => ({ ...p, [w.id]: e.target.value }))}
-                      />
-                      <button className="az-btn-primary text-xs px-3 py-1" onClick={() => handleVwAction(w.id, "send")}>Mark Sent</button>
-                      <button className="text-xs px-3 py-1 rounded-ctl" style={{ border: "1px solid #ef4444", color: "#ef4444", background: "rgba(239,68,68,0.07)" }} onClick={() => handleVwAction(w.id, "reject")}>Reject</button>
-                    </div>
-                  )}
-                  {w.status === 1 && w.sentTxHash && (
-                    <p className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>TX: {w.sentTxHash}</p>
-                  )}
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                  <th className="text-left pb-2 font-normal">#</th>
+                  <th className="text-left pb-2 font-normal">User</th>
+                  <th className="text-left pb-2 font-normal">Asset</th>
+                  <th className="text-left pb-2 font-normal">Amount</th>
+                  <th className="text-left pb-2 font-normal">To Wallet</th>
+                  <th className="text-left pb-2 font-normal">Status</th>
+                  <th className="text-left pb-2 font-normal">Date</th>
+                  <th className="text-left pb-2 font-normal">Action</th>
+                </tr></thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {vwList
+                    .filter(w => {
+                      if (vwSearch && !JSON.stringify(w).toLowerCase().includes(vwSearch.toLowerCase())) return false;
+                      if (vwAssetFilter !== "-1" && w.assetType !== parseInt(vwAssetFilter)) return false;
+                      return true;
+                    })
+                    .slice((vwCardPage - 1) * 10, vwCardPage * 10)
+                    .map((w) => {
+                    const WD_STATUS = ["Pending","Sent","Rejected","Cancelled"];
+                    const WD_COLOR  = ["var(--warn)","var(--teal)","#ef4444","var(--muted)"];
+                    return (
+                      <tr key={w.id}>
+                        <td className="py-2 az-mono" style={{ color: "var(--muted)" }}>#{w.id}</td>
+                        <td className="py-2 az-mono" style={{ color: "var(--teal)" }}>{w.user?.username ?? w.user?.walletAddress?.slice(0,8)}.azr</td>
+                        <td className="py-2 az-mono font-semibold">{w.assetType === 0 ? "AZR" : "USDT"}</td>
+                        <td className="py-2 az-mono font-semibold">{w.amount.toFixed(4)}</td>
+                        <td className="py-2 az-mono" style={{ color: "var(--muted)" }}>{w.toWallet.slice(0,8)}…{w.toWallet.slice(-4)}</td>
+                        <td className="py-2"><span className="az-mono text-[11px] font-semibold" style={{ color: WD_COLOR[w.status] }}>{WD_STATUS[w.status] ?? "—"}</span></td>
+                        <td className="py-2" style={{ color: "var(--muted)" }}>{new Date(w.createdAt).toLocaleDateString()}</td>
+                        <td className="py-2">
+                          {w.status === 0 && (
+                            <div className="flex gap-1 items-center">
+                              <input className="az-input h-6 text-[11px]" style={{ width: 100 }} placeholder="TX hash" value={vwSentHash[w.id] ?? ""} onChange={e => setVwSentHash(p => ({ ...p, [w.id]: e.target.value }))} />
+                              <button className="az-btn-primary text-[11px] px-2 py-0.5" onClick={() => handleVwAction(w.id, "send")}>Sent</button>
+                              <button className="text-[11px] px-2 py-0.5 rounded-ctl" style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }} onClick={() => handleVwAction(w.id, "reject")}>Reject</button>
+                            </div>
+                          )}
+                          {w.status === 1 && w.sentTxHash && (() => {
+                            const isValid = /^0x[0-9a-fA-F]{64}$/.test(w.sentTxHash);
+                            const short = `${w.sentTxHash.slice(0,10)}…${w.sentTxHash.slice(-6)}`;
+                            const bscUrl = `${CHAIN_ID === 56 ? "https://bscscan.com/tx/" : "https://testnet.bscscan.com/tx/"}${w.sentTxHash}`;
+                            return (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {isValid ? (
+                                  <a href={bscUrl} target="_blank" rel="noopener noreferrer"
+                                    className="az-mono text-[10px] underline" style={{ color: "var(--teal)" }}
+                                    title="View on BSCScan">{short}</a>
+                                ) : (
+                                  <span className="az-mono text-[10px]" style={{ color: "var(--muted)" }} title={w.sentTxHash}>{short}</span>
+                                )}
+                                <button onClick={() => navigator.clipboard.writeText(w.sentTxHash)} title="Copy TX hash" style={{ color: "var(--muted)" }}>
+                                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <AdminPaginator page={vwCardPage} totalPages={Math.max(1, Math.ceil(vwList.length / 10))} total={vwList.length} pageSize={10}
+                onFirst={() => setVwCardPage(1)} onPrev={() => setVwCardPage(p => p-1)} onNext={() => setVwCardPage(p => p+1)} onLast={() => setVwCardPage(Math.max(1, Math.ceil(vwList.length / 10)))} />
             </div>
           )}
+        </AdminCard>
+
+        {/* Balance Adjustment History */}
+        <AdminCard title="Balance Adjustment History">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs" style={{ color: "var(--muted)" }}>All admin credit and debit operations</p>
+            <Link href={`/${locale}/app/admin/adjustments`} className="text-xs az-mono font-semibold" style={{ color: "var(--teal)" }}>View all →</Link>
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <input className="az-input flex-1 min-w-[160px] h-8 text-sm" placeholder="Search username or wallet…"
+              value={baSearch} onChange={e => setBaSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && fetchBalanceAdjustments(baSearch, baAsset, baAction)} />
+            <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={baAsset} onChange={e => { setBaAsset(e.target.value); fetchBalanceAdjustments(baSearch, e.target.value, baAction); }}>
+              <option value="">All Assets</option>
+              <option value="azr">AZR</option>
+              <option value="usdt">USDT</option>
+            </select>
+            <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
+              value={baAction} onChange={e => { setBaAction(e.target.value); fetchBalanceAdjustments(baSearch, baAsset, e.target.value); }}>
+              <option value="">All Actions</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+            <button className="az-btn-primary text-xs px-3 py-1.5" onClick={() => fetchBalanceAdjustments(baSearch, baAsset, baAction)} disabled={baLoading}>
+              {baLoading ? <Spinner size="sm" /> : "Refresh"}
+            </button>
+          </div>
+          {baList.length === 0 ? (
+            <p className="text-xs py-6 text-center" style={{ color: "var(--text-2)" }}>No balance adjustments yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <p className="text-[11px] az-mono mb-2" style={{ color: "var(--muted)" }}>Showing {baList.length} of {baTotal}</p>
+              <table className="w-full text-xs">
+                <thead><tr className="az-mono text-[11px] uppercase" style={{ color: "var(--muted)" }}>
+                  <th className="text-left pb-2 font-normal">#</th>
+                  <th className="text-left pb-2 font-normal">User</th>
+                  <th className="text-left pb-2 font-normal">Action</th>
+                  <th className="text-left pb-2 font-normal">Asset</th>
+                  <th className="text-left pb-2 font-normal">Amount</th>
+                  <th className="text-left pb-2 font-normal">By Admin</th>
+                  <th className="text-left pb-2 font-normal">Date</th>
+                </tr></thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
+                  {baList.slice((baCardPage - 1) * 10, baCardPage * 10).map((b: {id: number; user: {username: string; walletAddress: string}; action: string; asset: string; amount: number; adminWallet: string; note: string; createdAt: string}) => (
+                    <tr key={b.id}>
+                      <td className="py-2 az-mono" style={{ color: "var(--muted)" }}>#{b.id}</td>
+                      <td className="py-2 az-mono" style={{ color: "var(--teal)" }}>{b.user?.username}.azr</td>
+                      <td className="py-2"><span className="az-mono text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ background: b.action === "credit" ? "rgba(45,212,191,0.1)" : "rgba(239,68,68,0.1)", color: b.action === "credit" ? "var(--teal)" : "#ef4444" }}>{b.action === "credit" ? "+" : "−"} {b.action}</span></td>
+                      <td className="py-2 az-mono uppercase">{b.asset}</td>
+                      <td className="py-2 az-mono font-semibold">{b.amount.toFixed(4)}</td>
+                      <td className="py-2 az-mono" style={{ color: "var(--muted)" }}>{b.adminWallet.slice(0,8)}…</td>
+                      <td className="py-2" style={{ color: "var(--muted)" }}>{new Date(b.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <AdminPaginator page={baCardPage} totalPages={Math.max(1, Math.ceil(baList.length / 10))} total={baList.length} pageSize={10}
+            onFirst={() => setBaCardPage(1)} onPrev={() => setBaCardPage(p => p-1)} onNext={() => setBaCardPage(p => p+1)} onLast={() => setBaCardPage(Math.max(1, Math.ceil(baList.length / 10)))} />
         </AdminCard>
 
 

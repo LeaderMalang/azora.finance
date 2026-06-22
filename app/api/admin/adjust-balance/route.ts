@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const auth = await verifyAdmin(req);
   if (!auth.ok) return auth.response;
   try {
-    const { wallet, asset, amount, action } = await req.json();
+    const { wallet, asset, amount, action, note } = await req.json();
     if (!wallet || !asset || amount === undefined || !action) {
       return NextResponse.json({ error: "Missing fields (wallet, asset, amount, action)" }, { status: 400 });
     }
@@ -62,22 +62,34 @@ export async function POST(req: NextRequest) {
 
     const delta = action === "credit" ? amt : -amt;
 
-    const updated = await prisma.userBalance.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        usdtBalance: asset === "usdt" ? delta : 0,
-        azrBalance:  asset === "azr"  ? delta : 0,
-      },
-      update: asset === "usdt"
-        ? { usdtBalance: { increment: delta } }
-        : { azrBalance:  { increment: delta } },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.userBalance.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          usdtBalance: asset === "usdt" ? delta : 0,
+          azrBalance:  asset === "azr"  ? delta : 0,
+        },
+        update: asset === "usdt"
+          ? { usdtBalance: { increment: delta } }
+          : { azrBalance:  { increment: delta } },
+      }),
+      prisma.balanceAdjustment.create({
+        data: {
+          userId: user.id,
+          asset,
+          action,
+          amount: amt,
+          adminWallet: auth.wallet,
+          note: note ?? "",
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       ok: true,
-      usdtBalance: updated.usdtBalance,
-      azrBalance:  updated.azrBalance,
+      usdtBalance: (updated as unknown as { usdtBalance: number; azrBalance: number }).usdtBalance,
+      azrBalance:  (updated as unknown as { usdtBalance: number; azrBalance: number }).azrBalance,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Internal error" }, { status: 500 });

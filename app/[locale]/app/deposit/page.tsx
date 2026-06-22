@@ -6,6 +6,7 @@ import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useAccount } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { AdminPaginator } from "@/components/ui/AdminPaginator";
 
 type Deposit = {
   id: number;
@@ -26,6 +27,7 @@ export default function DepositPage() {
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [depPage, setDepPage] = useState(1);
   const [balance, setBalance] = useState<Balance>({ usdtBalance: 0, azrBalance: 0 });
   const [treasuryWallet, setTreasuryWallet] = useState("");
 
@@ -189,7 +191,7 @@ export default function DepositPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                    {deposits.map((d) => (
+                    {deposits.slice((depPage-1)*10, depPage*10).map((d) => (
                       <tr key={d.id}>
                         <td className="py-3 text-xs" style={{ color: "var(--text-2)" }}>
                           {new Date(d.createdAt).toLocaleDateString()}
@@ -211,6 +213,8 @@ export default function DepositPage() {
                 </table>
               </div>
             )}
+            <AdminPaginator page={depPage} totalPages={Math.max(1, Math.ceil(deposits.length/10))} total={deposits.length} pageSize={10}
+              onFirst={() => setDepPage(1)} onPrev={() => setDepPage(p => p-1)} onNext={() => setDepPage(p => p+1)} onLast={() => setDepPage(Math.max(1, Math.ceil(deposits.length/10)))} />
           </div>
         )}
       </div>

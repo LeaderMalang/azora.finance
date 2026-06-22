@@ -12,8 +12,9 @@ export async function GET(req: NextRequest) {
     prisma.referralEarning.findMany({ select: { amount: true } }),
   ]);
 
+  // Amounts are stored in wei (1e18 scale) — divide to get AZR
   const referralTotal = allEarnings
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0)
+    .reduce((sum, e) => sum + parseFloat(e.amount) / 1e18, 0)
     .toFixed(4);
 
   return NextResponse.json({ userCount, referralTotal });

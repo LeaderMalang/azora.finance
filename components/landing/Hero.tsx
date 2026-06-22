@@ -39,7 +39,7 @@ function LiveCard() {
       <div className="grid grid-cols-3 gap-3 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
         {[
           { k: "Daily yield", v: "+87.36", up: true },
-          { k: "Unlocks in", v: "128d" },
+          { k: "Unlocks in", v: "150d" },
           { k: "Referral", v: "+412", up: true },
         ].map((s) => (
           <div key={s.k}>

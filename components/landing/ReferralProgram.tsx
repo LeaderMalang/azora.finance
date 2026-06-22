@@ -5,8 +5,8 @@ import { useTranslations } from "next-intl";
 const NODES = [
   { label: "YOU", name: "your.azr", sub: "commissions paid in AZR", rate: "+820", rateLabel: "AZR earned", isYou: true },
   { label: "L1", name: "maya.azr", sub: "staked 8,000 AZR", rate: "5%", rateLabel: "= 400 AZR", pct: "5%" },
-  { label: "L2", name: "deniz.azr", sub: "staked 10,000 AZR", rate: "3%", rateLabel: "= 300 AZR", pct: "3%" },
-  { label: "L3", name: "arman.azr", sub: "staked 6,000 AZR", rate: "2%", rateLabel: "= 120 AZR", pct: "2%" },
+  { label: "L2", name: "deniz.azr", sub: "staked 10,000 AZR", rate: "2%", rateLabel: "= 200 AZR", pct: "2%" },
+  { label: "L3", name: "arman.azr", sub: "staked 6,000 AZR", rate: "1%", rateLabel: "= 60 AZR", pct: "1%" },
 ];
 
 export function ReferralProgram() {
@@ -23,8 +23,8 @@ export function ReferralProgram() {
 
             {[
               { badge: "L1", label: t("l1"), pct: "5%", teal: true },
-              { badge: "L2", label: t("l2"), pct: "3%" },
-              { badge: "L3", label: t("l3"), pct: "2%" },
+              { badge: "L2", label: t("l2"), pct: "2%" },
+              { badge: "L3", label: t("l3"), pct: "1%" },
             ].map((row) => (
               <div key={row.badge} className="flex items-center justify-between py-4 border-b" style={{ borderColor: "var(--line)" }}>
                 <div className="flex items-center gap-3">

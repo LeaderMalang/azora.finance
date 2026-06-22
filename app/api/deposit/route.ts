@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerPublicClient, ADMIN_TREASURY_WALLET, USDT_ADDRESS } from "@/lib/rpc";
+import { getServerPublicClient, USDT_ADDRESS } from "@/lib/rpc";
+import { getSettings } from "@/lib/settings";
 import { parseEventLogs } from "viem";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,11 @@ export async function POST(req: NextRequest) {
     if (!txHash || !wallet) {
       return NextResponse.json({ error: "Missing txHash or wallet" }, { status: 400 });
     }
-    if (!ADMIN_TREASURY_WALLET) {
+    // Get treasury wallet from DB (admin-configurable), fallback to env var
+    const settings = await getSettings();
+    const TREASURY_WALLET = (settings.treasuryWallet || process.env.ADMIN_TREASURY_WALLET || "").toLowerCase();
+
+    if (!TREASURY_WALLET) {
       return NextResponse.json({ error: "Treasury wallet not configured" }, { status: 500 });
     }
 
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
     const match = transferLogs.find(
       (log) =>
         log.address.toLowerCase() === usdtAddr &&
-        (log.args.to as string).toLowerCase() === ADMIN_TREASURY_WALLET &&
+        (log.args.to as string).toLowerCase() === TREASURY_WALLET &&
         (log.args.from as string).toLowerCase() === wallet.toLowerCase()
     );
 

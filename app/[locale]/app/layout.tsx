@@ -6,9 +6,8 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { SupportButton } from "@/components/ui/SupportButton";
 import { SidebarContext } from "@/components/app/SidebarContext";
-import { useAccount, useReadContract, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { useState, useEffect } from "react";
-import { CONTRACTS, STAKING_ABI } from "@/lib/contracts";
 import { targetChain } from "@/lib/wagmi";
 import { useAppStore } from "@/lib/store";
 
@@ -44,6 +43,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
   const [wasConnected, setWasConnected] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const setUsername = useAppStore((s) => s.setUsername);
+  const setIsAdmin  = useAppStore((s) => s.setIsAdmin);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -51,67 +51,35 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
     if (isConnected) {
       setWasConnected(true);
     } else if (wasConnected && mounted) {
-      setUsername(""); // Clear stale username when wallet disconnects
+      setUsername("");  // Clear stale username when wallet disconnects
+      setIsAdmin(false); // Clear admin state on disconnect
       window.location.href = `/${locale}`;
     }
   }, [isConnected, mounted]);
 
-  const { data: userInfo } = useReadContract({
-    address: CONTRACTS[targetChain.id as 56 | 97].staking,
-    abi: STAKING_ABI,
-    functionName: "usersByAddress",
-    args: addr ? [addr] : undefined,
-    chainId: targetChain.id,
-    query: { enabled: !!addr && isConnected, retry: 3 },
-  });
+  // DB-only registration + username + admin check (no on-chain calls — custodial system)
+  const [dbRegistered, setDbRegistered] = useState<boolean | null>(null); // null = checking
 
-  const { data: ownerAddr } = useReadContract({
-    address: CONTRACTS[targetChain.id as 56 | 97].staking,
-    abi: STAKING_ABI,
-    functionName: "owner",
-    chainId: targetChain.id,
-    query: { enabled: true },
-  });
-
-  const isRegistered = Boolean(userInfo?.[2]);
-  const contractUsername = (userInfo?.[1] as string) ?? "";
-  const isOwner = !!addr && !!ownerAddr && addr.toLowerCase() === (ownerAddr as string).toLowerCase();
-
-  // DB-first username load — fast and reliable for existing users
   useEffect(() => {
-    if (!addr) return; // Don't clear on transient undefined during wagmi hydration
-    fetch(`/api/users?wallet=${addr}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.user?.username) setUsername(d.user.username); })
-      .catch((e) => console.error("[username fetch]", e));
-  }, [addr, setUsername]);
+    if (!addr) { setDbRegistered(null); return; }
+    Promise.all([
+      fetch(`/api/users?wallet=${addr}`).then(r => r.json()),
+      fetch(`/api/admin/auth?wallet=${addr}`).then(r => r.json()),
+    ]).then(([userResp, adminResp]) => {
+      if (userResp.user?.username) {
+        setUsername(userResp.user.username);
+        setDbRegistered(true);
+      } else {
+        setDbRegistered(false); // will trigger ConnectModal
+      }
+      setIsAdmin(!!adminResp.isAdmin);
+    }).catch(() => {
+      setDbRegistered(false);
+    });
+  }, [addr, setUsername, setIsAdmin]);
 
-  // Contract fallback — sets store when RPC resolves (covers new/unregistered users)
-  useEffect(() => {
-    if (contractUsername) setUsername(contractUsername);
-  }, [contractUsername, setUsername]);
-
-  const { data: referredByData } = useReadContract({
-    address: CONTRACTS[targetChain.id as 56 | 97].staking,
-    abi: STAKING_ABI,
-    functionName: "referredBy",
-    args: contractUsername ? [contractUsername] : undefined,
-    chainId: targetChain.id,
-    query: { enabled: !!contractUsername && isRegistered },
-  });
-
-  // Sync registered wallet to DB (ensures referral links are saved)
-  useEffect(() => {
-    if (!isRegistered || !addr || !contractUsername) return;
-    const referrer = (referredByData as string) ?? "";
-    fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: contractUsername, walletAddress: addr, referralUsername: referrer }),
-    }).catch(() => {});
-  }, [isRegistered, addr, contractUsername, referredByData]);
-
-  const showModal = mounted && isConnected && !isRegistered;
+  // Show modal only after DB check completes and user is not registered
+  const showModal = mounted && isConnected && dbRegistered === false;
 
   return (
     <SidebarContext.Provider value={{ open: sidebarOpen, toggle: () => setSidebarOpen((p) => !p) }}>
@@ -126,7 +94,7 @@ function AppShell({ children, locale }: { children: React.ReactNode; locale: str
           />
         )}
         <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
-          <AppSidebar locale={locale} isOwner={isOwner} />
+          <AppSidebar locale={locale} />
           <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
             <WrongNetworkBanner />
             {!mounted ? (

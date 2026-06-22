@@ -26,8 +26,9 @@ const NAV = [
   { key: "withdrawals", icon: '<path d="M12 3v12M8 11l4 4 4-4M5 21h14"/>' },
 ];
 
-export function AppSidebar({ locale, isOwner }: { locale: string; isOwner: boolean }) {
+export function AppSidebar({ locale }: { locale: string }) {
   const username = useAppStore((s) => s.username);
+  const isAdmin  = useAppStore((s) => s.isAdmin);
   const t = useTranslations("app");
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -53,7 +54,7 @@ export function AppSidebar({ locale, isOwner }: { locale: string; isOwner: boole
 
   const allNav = [
     ...NAV,
-    ...(isOwner ? [{ key: "admin", icon: '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z"/><path d="M12 8v4M12 16h.01"/>' }] : []),
+    ...(isAdmin ? [{ key: "admin", icon: '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z"/><path d="M12 8v4M12 16h.01"/>' }] : []),
   ];
 
   return (

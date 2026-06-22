@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
+import { isAddress } from "viem";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const auth = await verifyAdmin(req);
-  if (!auth.ok) return auth.response;
+// GET is public — user-facing pages (stake, withdraw) need to read settings
+export async function GET() {
   const settings = await getSettings();
   return NextResponse.json(settings);
 }
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     const {
       minStakeAzr, lockDays, dailyRewardPct, minWithdrawal,
       withdrawalFeePct, referralRateL1, referralRateL2, referralRateL3,
+      treasuryWallet,
     } = raw;
 
     // Validate bounds
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest) {
     const totalRef = (referralRateL1 ?? 0) + (referralRateL2 ?? 0) + (referralRateL3 ?? 0);
     if (totalRef > 50)
       return NextResponse.json({ error: "Total referral rates (L1+L2+L3) cannot exceed 50%" }, { status: 400 });
+    if (treasuryWallet !== undefined && treasuryWallet !== "" && !isAddress(treasuryWallet))
+      return NextResponse.json({ error: "Treasury wallet must be a valid BSC address (0x...)" }, { status: 400 });
 
     const updated = await prisma.appSettings.upsert({
       where: { id: 1 },
@@ -47,6 +50,7 @@ export async function POST(req: NextRequest) {
         referralRateL1:   referralRateL1   ?? 5,
         referralRateL2:   referralRateL2   ?? 3,
         referralRateL3:   referralRateL3   ?? 1,
+        treasuryWallet:   treasuryWallet   ?? "",
       },
       update: {
         ...(minStakeAzr      !== undefined && { minStakeAzr }),
@@ -57,6 +61,7 @@ export async function POST(req: NextRequest) {
         ...(referralRateL1   !== undefined && { referralRateL1 }),
         ...(referralRateL2   !== undefined && { referralRateL2 }),
         ...(referralRateL3   !== undefined && { referralRateL3 }),
+        ...(treasuryWallet   !== undefined && { treasuryWallet }),
       },
     });
     return NextResponse.json({ ok: true, settings: updated });

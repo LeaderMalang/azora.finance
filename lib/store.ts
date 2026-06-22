@@ -14,6 +14,8 @@ interface AppStore {
   setActiveChainId: (id: 56 | 97) => void;
   username: string;
   setUsername: (u: string) => void;
+  isAdmin: boolean;
+  setIsAdmin: (v: boolean) => void;
 }
 
 const defaultChainId = (Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97) === 56 ? 56 : 97) as 56 | 97;
@@ -31,6 +33,8 @@ export const useAppStore = create<AppStore>()(
       setActiveChainId: (id) => set({ activeChainId: id }),
       username: "",
       setUsername: (u) => set({ username: u }),
+      isAdmin: false,
+      setIsAdmin: (v) => set({ isAdmin: v }),
     }),
     {
       name: "azora-app-state-v1",

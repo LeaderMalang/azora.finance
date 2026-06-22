@@ -26,17 +26,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "reject") {
-      // Refund balance on rejection
+      // Refund the full GROSS amount (net + fee) that was originally deducted from the user's balance
+      const grossRefund = existing.amount + existing.fee;
       const updated = await prisma.virtualWithdrawal.update({
         where: { id: Number(withdrawalId) },
         data: { status: 2 },
       });
-      // Restore balance
       await prisma.userBalance.update({
         where: { userId: existing.userId },
         data: existing.assetType === 0
-          ? { azrBalance:  { increment: existing.amount } }
-          : { usdtBalance: { increment: existing.amount } },
+          ? { azrBalance:  { increment: grossRefund } }
+          : { usdtBalance: { increment: grossRefund } },
       });
       return NextResponse.json({ ok: true, withdrawal: updated });
     }

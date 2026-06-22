@@ -10,6 +10,7 @@ import { formatUnits } from "viem";
 import { CONTRACTS, STAKING_ABI, REFERRAL_COMMISSION_EVENT, STAKING_DEPLOY_BLOCK } from "@/lib/contracts";
 import { useActiveChain } from "@/lib/hooks";
 import { useAppStore } from "@/lib/store";
+import { AdminPaginator } from "@/components/ui/AdminPaginator";
 
 async function getLogsChunked(
   client: ReturnType<typeof usePublicClient>,
@@ -97,6 +98,7 @@ export default function ReferralsPage() {
   const [entries, setEntries] = useState<DisplayEntry[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [lvlFilter, setLvlFilter] = useState(-1);
+  const [commPage, setCommPage]   = useState(1);
   const [network, setNetwork] = useState<ReferralNetwork | null>(null);
   const [dbUpline, setDbUpline] = useState("");
   const publicClient = usePublicClient({ chainId: chainId as 56 | 97 });
@@ -379,7 +381,7 @@ export default function ReferralsPage() {
                 className="rounded-ctl px-3 py-1.5 text-xs az-mono"
                 style={{ background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" }}
                 value={lvlFilter}
-                onChange={(e) => setLvlFilter(Number(e.target.value))}
+                onChange={(e) => { setLvlFilter(Number(e.target.value)); setCommPage(1); }}
               >
                 <option value={-1}>All Levels</option>
                 <option value={1}>L1 ({fmtRate(rates.l1)})</option>
@@ -418,7 +420,7 @@ export default function ReferralsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                    {filteredCommissions.map((e, i) => (
+                    {filteredCommissions.slice((commPage-1)*10, commPage*10).map((e, i) => (
                       <tr key={e.txHash ?? i}>
                         <td className="py-3">
                           <span
@@ -439,9 +441,8 @@ export default function ReferralsPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
-                Showing {filteredCommissions.length} of {entries.length} commissions
-              </p>
+              <AdminPaginator page={commPage} totalPages={Math.max(1, Math.ceil(filteredCommissions.length/10))} total={filteredCommissions.length} pageSize={10}
+                onFirst={() => setCommPage(1)} onPrev={() => setCommPage(p => p-1)} onNext={() => setCommPage(p => p+1)} onLast={() => setCommPage(Math.max(1, Math.ceil(filteredCommissions.length/10)))} />
             </>
           )}
         </div>

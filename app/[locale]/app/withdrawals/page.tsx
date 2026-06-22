@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { useAccount } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { AdminPaginator } from "@/components/ui/AdminPaginator";
 
 type VirtualWithdrawal = {
   id: number;
@@ -19,27 +20,72 @@ type VirtualWithdrawal = {
   createdAt: string;
 };
 
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
+const BSCSCAN_URL = CHAIN_ID === 56
+  ? "https://bscscan.com/tx/"
+  : "https://testnet.bscscan.com/tx/";
+
+// Valid BSC tx hash: 0x followed by exactly 64 hex characters
+const isValidTxHash = (hash: string) => /^0x[0-9a-fA-F]{64}$/.test(hash);
+
+function TxHashLink({ hash }: { hash: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(hash);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const valid = isValidTxHash(hash);
+  const short = `${hash.slice(0, 10)}…${hash.slice(-6)}`;
+  const copyBtn = (
+    <button onClick={copy} title="Copy TX hash" className="flex-shrink-0" style={{ color: copied ? "var(--teal)" : "var(--muted)" }}>
+      {copied
+        ? <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+        : <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+      }
+    </button>
+  );
+  return (
+    <div className="flex items-center gap-1 mt-0.5">
+      {valid ? (
+        <a href={`${BSCSCAN_URL}${hash}`} target="_blank" rel="noopener noreferrer"
+          className="text-[10px] az-mono underline" style={{ color: "var(--teal)" }}
+          title="View on BSCScan">
+          TX: {short}
+        </a>
+      ) : (
+        <span className="text-[10px] az-mono" style={{ color: "var(--muted)" }} title={hash}>
+          TX: {short}
+        </span>
+      )}
+      {copyBtn}
+    </div>
+  );
+}
+
 const ASSET_LABEL = ["AZR", "USDT"];
-const STATUS_LABEL = ["Pending", "Sent", "Rejected"];
-const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444"];
+const STATUS_LABEL = ["Pending", "Sent", "Rejected", "Cancelled"];
+const STATUS_COLOR = ["var(--warn)", "var(--teal)", "#ef4444", "var(--muted)"];
 
 export default function WithdrawalsPage() {
   const t = useTranslations("withdrawalsPage");
   const { address: addr } = useAccount();
   const { toast } = useToast();
 
-  const [asset, setAsset]           = useState<0 | 1>(0);
-  const [amount, setAmount]         = useState("");
-  const [toWallet, setToWallet]     = useState("");
-  const [inputErr, setInputErr]     = useState("");
+  const [asset, setAsset] = useState<0 | 1>(0);
+  const [amount, setAmount] = useState("");
+  const [toWallet, setToWallet] = useState("");
+  const [inputErr, setInputErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading]       = useState(false);
+  const [loading, setLoading] = useState(false);
   const [azrBalance, setAzrBalance] = useState(0);
   const [usdtBalance, setUsdtBalance] = useState(0);
   const [withdrawals, setWithdrawals] = useState<VirtualWithdrawal[]>([]);
   const [statusFilter, setStatusFilter] = useState(-1);
-  const [assetFilter, setAssetFilter]   = useState(-1);
+  const [assetFilter, setAssetFilter] = useState(-1);
+  const [wdPage, setWdPage] = useState(1);
   const [withdrawalFee, setWithdrawalFee] = useState(0);
+  const [cancelling, setCancelling] = useState<number | null>(null); // id being cancelled
 
   const fetchData = useCallback(async () => {
     if (!addr) return;
@@ -51,12 +97,12 @@ export default function WithdrawalsPage() {
         fetch("/api/admin/settings"),
       ]);
       if (balRes.ok) { const d = await balRes.json(); setAzrBalance(d.azrBalance ?? 0); setUsdtBalance(d.usdtBalance ?? 0); }
-      if (wdRes.ok)  { const d = await wdRes.json();  setWithdrawals(d.withdrawals ?? []); }
+      if (wdRes.ok) { const d = await wdRes.json(); setWithdrawals(d.withdrawals ?? []); }
       if (settingsRes.ok) { const d = await settingsRes.json(); setWithdrawalFee(d.withdrawalFeePct ?? 0); }
     } finally { setLoading(false); }
   }, [addr]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); setWdPage(1); }, [fetchData]);
 
   const bal = asset === 0 ? azrBalance : usdtBalance;
   const assetLabel = ASSET_LABEL[asset];
@@ -77,18 +123,41 @@ export default function WithdrawalsPage() {
       toast(`Withdrawal of ${amount} ${assetLabel} requested · pending admin approval`);
       setAmount("");
       setToWallet("");
+      setWdPage(1);
       fetchData();
     } catch { toast("Network error", "error"); }
     finally { setSubmitting(false); }
   };
 
+  const doCancel = async (withdrawalId: number, assetType: number, amount: number) => {
+    if (!addr) return;
+    if (!confirm(`Cancel this withdrawal of ${amount.toFixed(4)} ${ASSET_LABEL[assetType]}? The amount will be refunded to your balance.`)) return;
+    setCancelling(withdrawalId);
+    try {
+      const res = await fetch("/api/virtual/withdraw", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: addr, withdrawalId }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast(d.error ?? "Cancel failed", "error"); return; }
+      toast(`Withdrawal cancelled · ${d.refunded.toFixed(4)} ${ASSET_LABEL[assetType]} refunded to your balance`);
+      fetchData();
+    } catch { toast("Network error", "error"); }
+    finally { setCancelling(null); }
+  };
+
   const filtered = withdrawals
     .filter((w) => {
       if (statusFilter !== -1 && w.status !== statusFilter) return false;
-      if (assetFilter  !== -1 && w.assetType !== assetFilter) return false;
+      if (assetFilter !== -1 && w.assetType !== assetFilter) return false;
       return true;
     })
     .sort((a, b) => b.id - a.id);
+
+  const WD_PAGE_SIZE = 10;
+  const wdTotalPages = Math.max(1, Math.ceil(filtered.length / WD_PAGE_SIZE));
+  const visibleWithdrawals = filtered.slice((wdPage - 1) * WD_PAGE_SIZE, wdPage * WD_PAGE_SIZE);
 
   const selectStyle = { background: "var(--bg-2)", border: "1px solid var(--line)", color: "var(--text-2)" };
 
@@ -111,8 +180,8 @@ export default function WithdrawalsPage() {
                     className="flex-1 py-2.5 rounded-ctl border text-sm font-semibold transition-all flex items-center justify-center gap-2"
                     style={{
                       borderColor: asset === o.val ? "var(--teal)" : "var(--line)",
-                      background:  asset === o.val ? "rgba(45,212,191,0.08)" : "var(--bg-2)",
-                      color:       asset === o.val ? "var(--teal)" : "var(--text-2)",
+                      background: asset === o.val ? "rgba(45,212,191,0.08)" : "var(--bg-2)",
+                      color: asset === o.val ? "var(--teal)" : "var(--text-2)",
                     }}
                   >
                     <TokenIcon symbol={o.label as "AZR" | "USDT"} size="sm" />
@@ -170,8 +239,103 @@ export default function WithdrawalsPage() {
               {submitting ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Processing…</span> : t("submit")}
             </button>
             <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
-              Withdrawals are reviewed and sent manually by admin · no fee deducted from your request amount.
+              Withdrawals are sent to the set destination wallet
             </p>
+          </div>
+
+          {/* Right column — balance summary + how it works */}
+          <div className="space-y-4">
+
+            {/* Available Balance */}
+            {addr && (
+              <div className="az-card-glow relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10" style={{ background: "radial-gradient(ellipse at top right, var(--teal), transparent 70%)" }} />
+                <div className="relative z-10">
+                  <div className="text-xs az-mono mb-4" style={{ color: "var(--muted)" }}>AVAILABLE BALANCE</div>
+                  <div className="space-y-3 mb-4">
+                    {[
+                      { symbol: "AZR" as const, label: "AZR", value: azrBalance },
+                      { symbol: "USDT" as const, label: "USDT", value: usdtBalance },
+                    ].map((b) => (
+                      <div key={b.symbol} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <TokenIcon symbol={b.symbol} size="sm" />
+                          <span className="text-sm font-semibold az-mono">{b.label}</span>
+                        </div>
+                        <span className="font-bold az-mono text-lg" style={{ color: "var(--teal)" }}>
+                          {b.value.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Withdrawal stats */}
+                  {withdrawals.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 pt-3" style={{ borderTop: "1px solid var(--line)" }}>
+                      {[
+                        { label: "Pending", count: withdrawals.filter(w => w.status === 0).length, color: "var(--warn)" },
+                        { label: "Sent",    count: withdrawals.filter(w => w.status === 1).length, color: "var(--teal)" },
+                        { label: "Total",   count: withdrawals.length, color: "var(--text-2)" },
+                      ].map(s => (
+                        <div key={s.label} className="text-center">
+                          <div className="font-bold az-mono text-lg" style={{ color: s.color }}>{s.count}</div>
+                          <div className="text-[10px] az-mono" style={{ color: "var(--muted)" }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* How withdrawals work */}
+            <div className="az-card">
+              <div className="text-xs az-mono mb-4 uppercase tracking-wider" style={{ color: "var(--muted)" }}>How Withdrawals Work</div>
+              <div className="space-y-4">
+                {[
+                  {
+                    step: "1",
+                    title: "Submit Request",
+                    desc: "Choose asset & amount, enter your BSC wallet address, and submit.",
+                  },
+                  {
+                    step: "2",
+                    title: "Admin Reviews",
+                    desc: "Your request enters the queue and is reviewed manually. Usually processed within 24 hours.",
+                  },
+                  {
+                    step: "3",
+                    title: "Tokens Sent",
+                    desc: "Admin sends real tokens from the treasury directly to your wallet address.",
+                  },
+                ].map(s => (
+                  <div key={s.step} className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold az-mono mt-0.5"
+                      style={{ background: "rgba(45,212,191,0.12)", color: "var(--teal)", border: "1px solid rgba(45,212,191,0.25)" }}>
+                      {s.step}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold mb-0.5">{s.title}</div>
+                      <div className="text-xs" style={{ color: "var(--text-2)" }}>{s.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Fee + minimum info */}
+              {(withdrawalFee > 0) && (
+                <div className="mt-4 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--line)" }}>
+                  <div className="flex justify-between text-xs">
+                    <span style={{ color: "var(--muted)" }}>Withdrawal fee</span>
+                    <span className="az-mono font-semibold" style={{ color: "var(--teal)" }}>{withdrawalFee}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span style={{ color: "var(--muted)" }}>Network</span>
+                    <span className="az-mono font-semibold">BNB Chain (BEP-20)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
@@ -179,13 +343,14 @@ export default function WithdrawalsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h3 className="font-semibold">{t("queue")}</h3>
             <div className="flex flex-wrap items-center gap-2">
-              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(Number(e.target.value))}>
+              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={statusFilter} onChange={(e) => { setStatusFilter(Number(e.target.value)); setWdPage(1); }}>
                 <option value={-1}>All Status</option>
                 <option value={0}>Pending</option>
                 <option value={1}>Sent</option>
                 <option value={2}>Rejected</option>
+                <option value={3}>Cancelled</option>
               </select>
-              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={assetFilter} onChange={(e) => setAssetFilter(Number(e.target.value))}>
+              <select className="rounded-ctl px-3 py-1.5 text-xs az-mono" style={selectStyle} value={assetFilter} onChange={(e) => { setAssetFilter(Number(e.target.value)); setWdPage(1); }}>
                 <option value={-1}>All Assets</option>
                 <option value={0}>AZR</option>
                 <option value={1}>USDT</option>
@@ -194,7 +359,7 @@ export default function WithdrawalsPage() {
           </div>
 
           {loading ? (
-            <div className="space-y-3 py-4">{[0,1,2].map((i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+            <div className="space-y-3 py-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
           ) : filtered.length === 0 ? (
             <div className="py-10 text-center" style={{ color: "var(--text-2)" }}>
               {withdrawals.length === 0 ? t("noRequests") : "No requests match the current filters."}
@@ -210,10 +375,11 @@ export default function WithdrawalsPage() {
                     <th className="text-left pb-3 font-normal">To Wallet</th>
                     <th className="text-left pb-3 font-normal">Status</th>
                     <th className="text-left pb-3 font-normal">Date</th>
+                    <th className="text-left pb-3 font-normal">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {filtered.map((req) => (
+                  {visibleWithdrawals.map((req) => (
                     <tr key={req.id}>
                       <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{req.id}</td>
                       <td className="py-3">
@@ -231,13 +397,25 @@ export default function WithdrawalsPage() {
                           {STATUS_LABEL[req.status] ?? "Unknown"}
                         </span>
                         {req.status === 1 && req.sentTxHash && (
-                          <div className="text-[10px] az-mono mt-0.5" style={{ color: "var(--muted)" }}>
-                            TX: {req.sentTxHash.slice(0, 10)}…
-                          </div>
+                          <TxHashLink hash={req.sentTxHash} />
                         )}
                       </td>
                       <td className="py-3 text-xs az-mono" style={{ color: "var(--muted)" }}>
                         {new Date(req.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3">
+                        {req.status === 0 ? (
+                          <button
+                            className="text-xs px-3 py-1.5 rounded-ctl font-semibold"
+                            style={{ color: "#ef4444", border: "1px solid #ef4444", background: "rgba(239,68,68,0.1)" }}
+                            disabled={cancelling === req.id}
+                            onClick={() => doCancel(req.id, req.assetType, req.amount)}
+                          >
+                            {cancelling === req.id ? <Spinner size="sm" /> : "Cancel"}
+                          </button>
+                        ) : (
+                          <span className="text-xs az-mono" style={{ color: "var(--muted)" }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -245,11 +423,8 @@ export default function WithdrawalsPage() {
               </table>
             </div>
           )}
-          {withdrawals.length > 0 && (
-            <p className="text-[11px] az-mono mt-3" style={{ color: "var(--muted)" }}>
-              Showing {filtered.length} of {withdrawals.length} requests
-            </p>
-          )}
+          <AdminPaginator page={wdPage} totalPages={wdTotalPages} total={filtered.length} pageSize={WD_PAGE_SIZE}
+            onFirst={() => setWdPage(1)} onPrev={() => setWdPage(p => p - 1)} onNext={() => setWdPage(p => p + 1)} onLast={() => setWdPage(wdTotalPages)} />
         </div>
       </div>
     </>

@@ -23,6 +23,7 @@ model User {
   referralEarnings    ReferralEarning[]
   userBalance         UserBalance?
   deposits            Deposit[]
+  balanceAdjustments  BalanceAdjustment[]
   virtualStakes       VirtualStake[]
   virtualWithdrawals  VirtualWithdrawal[]
 }
@@ -73,6 +74,20 @@ model UserBalance {
   updatedAt   DateTime @updatedAt
 }
 
+model BalanceAdjustment {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  asset       String
+  action      String
+  amount      Float
+  adminWallet String
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
 model AdminWallet {
   id            Int      @id @default(autoincrement())
   walletAddress String   @unique
@@ -92,6 +107,7 @@ model AppSettings {
   referralRateL1   Float    @default(5)
   referralRateL2   Float    @default(3)
   referralRateL3   Float    @default(1)
+  treasuryWallet   String   @default("")
   updatedAt        DateTime @updatedAt
 }
 
@@ -126,7 +142,8 @@ model VirtualWithdrawal {
   id         Int      @id @default(autoincrement())
   userId     String
   user       User     @relation(fields: [userId], references: [id])
-  amount     Float
+  amount     Float                      // net amount (after fee) — what admin sends
+  fee        Float    @default(0)       // fee deducted at request time
   assetType  Int      // 0=AZR, 1=USDT
   toWallet   String
   status     Int      @default(0) // 0=pending, 1=sent, 2=rejected

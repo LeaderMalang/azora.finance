@@ -7,15 +7,34 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
   if (!auth.ok) return auth.response;
-  const status = req.nextUrl.searchParams.get("status");
 
-  const withdrawals = await prisma.virtualWithdrawal.findMany({
-    where: status !== null ? { status: Number(status) } : undefined,
-    include: {
-      user: { select: { username: true, walletAddress: true, seqId: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const status  = req.nextUrl.searchParams.get("status");
+  const search  = req.nextUrl.searchParams.get("search");
+  const limit   = Math.min(parseInt(req.nextUrl.searchParams.get("limit") ?? "50"), 200);
+  const skip    = parseInt(req.nextUrl.searchParams.get("skip") ?? "0");
 
-  return NextResponse.json({ withdrawals });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = {};
+  if (status !== null && status !== "") where.status = Number(status);
+  if (search) {
+    where.user = {
+      OR: [
+        { walletAddress: { contains: search, mode: "insensitive" } },
+        { username:      { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
+
+  const [total, withdrawals] = await Promise.all([
+    prisma.virtualWithdrawal.count({ where }),
+    prisma.virtualWithdrawal.findMany({
+      where,
+      include: { user: { select: { username: true, walletAddress: true, seqId: true } } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip,
+    }),
+  ]);
+
+  return NextResponse.json({ total, withdrawals });
 }

@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
+import { AdminPaginator } from "@/components/ui/AdminPaginator";
 
 type VirtualStake = {
   id: number;
@@ -33,6 +34,8 @@ export default function StakePage() {
   const [minStake, setMinStake]      = useState(50);
   const [dailyRate, setDailyRate]    = useState(0.7);
   const [claimHistory, setClaimHistory] = useState<ClaimRow[]>([]);
+  const [posPage, setPosPage]           = useState(1);
+  const [claimPage, setClaimPage]       = useState(1);
   // Live pending display updated every second
   const [liveRewards, setLiveRewards] = useState<Record<number, number>>({});
 
@@ -221,19 +224,28 @@ export default function StakePage() {
                     <th className="text-left pb-3 font-normal">#</th>
                     <th className="text-left pb-3 font-normal">Staked</th>
                     <th className="text-left pb-3 font-normal">Unlocks</th>
+                    <th className="text-left pb-3 font-normal">Progress</th>
                     <th className="text-left pb-3 font-normal">Pending</th>
                     <th className="text-right pb-3 font-normal">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                  {activeStakes.map((pos) => {
+                  {activeStakes.slice((posPage-1)*10, posPage*10).map((pos) => {
                     const livePending = liveRewards[pos.id] ?? pos.pendingRewards;
+                    const now     = Date.now();
+                    const start   = new Date(pos.startTime).getTime();
+                    const unlock  = new Date(pos.unlockTime).getTime();
+                    const progress = Math.min(100, Math.round(((now - start) / (unlock - start)) * 100));
                     return (
                       <tr key={pos.id}>
                         <td className="py-3 az-mono text-xs" style={{ color: "var(--muted)" }}>#{pos.id}</td>
                         <td className="py-3 font-semibold az-mono">{pos.amount.toFixed(2)} AZR</td>
                         <td className="py-3 az-mono text-xs" style={{ color: pos.unlocked ? "var(--teal)" : "var(--text-2)" }}>
                           {pos.unlocked ? "Unlocked ✓" : new Date(pos.unlockTime).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 w-28">
+                          <div className="prog-bar"><div className="prog-fill" style={{ width: `${progress}%` }} /></div>
+                          <div className="text-[11px] mt-1 az-mono" style={{ color: "var(--muted)" }}>{progress}%</div>
                         </td>
                         <td className="py-3 az-mono text-xs" style={{ color: "var(--teal)" }}>
                           {livePending.toFixed(4)}
@@ -249,6 +261,8 @@ export default function StakePage() {
                 </tbody>
               </table>
             </div>
+            <AdminPaginator page={posPage} totalPages={Math.max(1, Math.ceil(activeStakes.length/10))} total={activeStakes.length} pageSize={10}
+              onFirst={() => setPosPage(1)} onPrev={() => setPosPage(p => p-1)} onNext={() => setPosPage(p => p+1)} onLast={() => setPosPage(Math.max(1, Math.ceil(activeStakes.length/10)))} />
           </div>
         )}
 
@@ -271,17 +285,22 @@ export default function StakePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ borderColor: "var(--line)" }}>
-                    {claimHistory.map((c, i) => (
-                      <tr key={i}>
-                        <td className="py-2.5 az-mono text-xs" style={{ color: "var(--muted)" }}>{claimHistory.length - i}</td>
-                        <td className="py-2.5 text-xs" style={{ color: "var(--text-2)" }}>{c.date}</td>
-                        <td className="py-2.5 az-mono text-right font-semibold" style={{ color: "var(--teal)" }}>+{c.amount}</td>
-                      </tr>
-                    ))}
+                    {claimHistory.slice((claimPage-1)*10, claimPage*10).map((c, i) => {
+                      const globalIdx = (claimPage-1)*10 + i;
+                      return (
+                        <tr key={i}>
+                          <td className="py-2.5 az-mono text-xs" style={{ color: "var(--muted)" }}>{claimHistory.length - globalIdx}</td>
+                          <td className="py-2.5 text-xs" style={{ color: "var(--text-2)" }}>{c.date}</td>
+                          <td className="py-2.5 az-mono text-right font-semibold" style={{ color: "var(--teal)" }}>+{c.amount}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+            <AdminPaginator page={claimPage} totalPages={Math.max(1, Math.ceil(claimHistory.length/10))} total={claimHistory.length} pageSize={10}
+              onFirst={() => setClaimPage(1)} onPrev={() => setClaimPage(p => p-1)} onNext={() => setClaimPage(p => p+1)} onLast={() => setClaimPage(Math.max(1, Math.ceil(claimHistory.length/10)))} />
           </div>
         )}
       </div>
