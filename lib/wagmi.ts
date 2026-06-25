@@ -3,10 +3,9 @@
 import { defaultWagmiConfig } from "@web3modal/wagmi/react/config";
 import { cookieStorage, createStorage } from "wagmi";
 import { http, fallback } from "viem";
-import { bsc, bscTestnet } from "viem/chains";
+import { bsc } from "viem/chains";
 
-const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
-export const targetChain = chainId === 56 ? bsc : bscTestnet;
+export const targetChain = bsc;
 
 export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!;
 
@@ -18,21 +17,17 @@ const metadata = {
 };
 
 export const wagmiConfig = defaultWagmiConfig({
-  chains: [bsc, bscTestnet],
+  chains: [bsc],
   projectId,
   metadata,
   ssr: true,
   storage: createStorage({ storage: cookieStorage }),
   transports: {
     [bsc.id]: fallback([
-      http("https://bsc.publicnode.com"),
-      http("https://bsc-dataseed.bnbchain.org"),
+      http("https://bsc-dataseed1.binance.org"),
+      http("https://bsc-dataseed2.binance.org"),
+      http("https://bsc-dataseed3.binance.org"),
       http("https://bsc-dataseed1.defibit.io"),
-    ]),
-    [bscTestnet.id]: fallback([
-      http("https://bsc-testnet.publicnode.com"),
-      http("https://data-seed-prebsc-1-s1.bnbchain.org:8545"),
-      http("https://data-seed-prebsc-2-s1.bnbchain.org:8545"),
     ]),
   },
 });

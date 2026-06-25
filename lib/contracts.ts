@@ -5,7 +5,7 @@ export const CONTRACTS = {
     usdt: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd" as `0x${string}`,
   },
   56: {
-    azoraToken: "0x34c7A9Dc9643223CB9f0dA4Ce9dd6f9f011EE206" as `0x${string}`,
+    azoraToken: "0x09A03Ee682E6C425aBccD5c5439DFD7e037ED269" as `0x${string}`,
     staking: "0xebA7e4F8d4a5404d3570782d85B012b2C4cd4CE9" as `0x${string}`,
     usdt: "0x55d398326f99059fF775485246999027B3197955" as `0x${string}`,
   },

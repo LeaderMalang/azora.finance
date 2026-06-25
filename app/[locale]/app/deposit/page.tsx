@@ -7,6 +7,7 @@ import { useAccount } from "wagmi";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { AdminPaginator } from "@/components/ui/AdminPaginator";
+import QRCode from "react-qr-code";
 
 type Deposit = {
   id: number;
@@ -107,13 +108,13 @@ export default function DepositPage() {
 
         {/* Step 1 — send USDT */}
         <div className="az-card">
-          <h3 className="font-semibold mb-4">Step 1 — Send USDT to Treasury Wallet</h3>
+          <h3 className="font-semibold mb-4">Step 1 — Send USDT to  Staking wallet</h3>
           <p className="text-xs mb-4" style={{ color: "var(--text-2)" }}>
             Send USDT (BEP-20) from your external wallet to the address below. Once confirmed on BSC, submit your transaction hash in Step 2.
           </p>
           {treasuryWallet ? (
             <div>
-              <label className="text-[11px] az-mono mb-2 block" style={{ color: "var(--muted)" }}>Treasury Wallet Address (BNB Chain / BEP-20)</label>
+              <label className="text-[11px] az-mono mb-2 block" style={{ color: "var(--muted)" }}> Staking wallet Address (BNB Chain / BEP-20)</label>
               <div className="flex gap-2 items-center">
                 <div
                   className="flex-1 rounded-ctl px-3 py-2.5 text-sm az-mono break-all"
@@ -132,10 +133,16 @@ export default function DepositPage() {
               <div className="mt-3 rounded-ctl px-3 py-2 text-[11px] az-mono" style={{ background: "rgba(243,186,47,0.08)", color: "#f3ba2f", border: "1px solid rgba(243,186,47,0.2)" }}>
                 ⚠ Only send USDT (BEP-20/BSC). Sending BNB or tokens on other chains will result in permanent loss.
               </div>
+              <div className="flex flex-col items-center gap-2 mt-5">
+                <div className="p-3 rounded-ctl" style={{ background: "#ffffff" }}>
+                  <QRCode value={treasuryWallet} size={156} />
+                </div>
+                <p className="text-[11px] az-mono" style={{ color: "var(--muted)" }}>Scan with your wallet or exchange app</p>
+              </div>
             </div>
           ) : (
             <div className="text-xs py-4 text-center" style={{ color: "var(--text-2)" }}>
-              Treasury wallet address not configured yet. Contact admin.
+               Staking wallet address not configured yet. Contact admin.
             </div>
           )}
         </div>
@@ -143,9 +150,12 @@ export default function DepositPage() {
         {/* Step 2 — submit TX hash */}
         <div className="az-card">
           <h3 className="font-semibold mb-4">Step 2 — Submit Your Transaction Hash</h3>
-          <p className="text-xs mb-4" style={{ color: "var(--text-2)" }}>
+          <p className="text-xs mb-3" style={{ color: "var(--text-2)" }}>
             After your USDT transfer is confirmed on BSC (usually 15–30 seconds), paste the transaction hash below. The system will verify it on-chain automatically and credit your USDT balance.
           </p>
+          <div className="mb-4 rounded-ctl px-3 py-2 text-[11px] az-mono" style={{ background: "rgba(45,212,191,0.06)", color: "var(--teal)", border: "1px solid rgba(45,212,191,0.15)" }}>
+            Sending from Binance, OKX or another exchange? Select BSC (BEP-20) network and paste the TX hash after it confirms.
+          </div>
           {!addr ? (
             <p className="text-sm py-4 text-center" style={{ color: "var(--text-2)" }}>Connect your wallet to submit a deposit.</p>
           ) : (

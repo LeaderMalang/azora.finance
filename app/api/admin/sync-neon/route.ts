@@ -143,7 +143,18 @@ export async function POST(req: NextRequest) {
     synced.virtualStakes = neonStakes.length;
 
     // 6. Sync VirtualWithdrawals (delete+recreate per user)
-    const neonWds = await neon.virtualWithdrawal.findMany();
+    // Use raw SQL fallback in case Neon's schema is behind (missing `fee` column)
+    type WdRow = { id: number; userId: string; amount: number; fee: number; assetType: number; toWallet: string; status: number; sentTxHash: string | null; createdAt: Date; updatedAt: Date };
+    let neonWds: WdRow[];
+    try {
+      neonWds = await neon.virtualWithdrawal.findMany() as WdRow[];
+    } catch {
+      neonWds = await neon.$queryRaw<WdRow[]>`
+        SELECT id, "userId", amount, COALESCE(fee, 0)::float8 AS fee, "assetType", "toWallet",
+               status, "sentTxHash", "createdAt", "updatedAt"
+        FROM "VirtualWithdrawal"
+      `;
+    }
     const wdUserIds = Array.from(new Set(neonWds.map(w => neonIdToLocalId[w.userId]).filter(Boolean))) as string[];
     if (wdUserIds.length > 0) {
       await prisma.virtualWithdrawal.deleteMany({ where: { userId: { in: wdUserIds } } });
@@ -152,7 +163,7 @@ export async function POST(req: NextRequest) {
       const localUserId = neonIdToLocalId[w.userId];
       if (!localUserId) continue;
       await prisma.virtualWithdrawal.create({
-        data: { userId: localUserId, amount: w.amount, assetType: w.assetType, toWallet: w.toWallet, status: w.status, sentTxHash: w.sentTxHash, createdAt: w.createdAt },
+        data: { userId: localUserId, amount: w.amount, fee: w.fee ?? 0, assetType: w.assetType, toWallet: w.toWallet, status: w.status, sentTxHash: w.sentTxHash, createdAt: w.createdAt },
       });
     }
     synced.virtualWithdrawals = neonWds.length;

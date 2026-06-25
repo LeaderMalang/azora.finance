@@ -121,6 +121,9 @@ export default function AdminPage() {
   const [vwCardPage, setVwCardPage] = useState(1);
   const [baCardPage, setBaCardPage] = useState(1);
   const [ulCardPage, setUlCardPage] = useState(1);
+  // DB migrations
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ ok: boolean; results: { id: string; status: "ok" | "error"; message?: string }[] } | null>(null);
   // DB sync
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [syncCounts, setSyncCounts] = useState<any>(null);
@@ -739,6 +742,50 @@ export default function AdminPage() {
           {/* Planned Features removed — all now implemented in custodial system */}
 
         </div>
+
+        {/* DB Migrations — run ALTER TABLE without phpPgAdmin */}
+        <AdminCard title="DB Migrations">
+          <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+            Applies missing schema columns to cPanel&apos;s PostgreSQL without needing phpPgAdmin.
+            Safe to run multiple times — all statements use <code className="text-[11px]">IF NOT EXISTS</code>.
+          </p>
+          {migrationResult && (
+            <div className="rounded-ctl p-3 mb-3 text-xs space-y-1" style={{ background: "var(--bg-2)" }}>
+              {migrationResult.results.map((r) => (
+                <div key={r.id} className="flex items-start gap-2">
+                  <span className="flex-shrink-0" style={{ color: r.status === "ok" ? "var(--teal)" : "#ef4444" }}>
+                    {r.status === "ok" ? "✓" : "✗"}
+                  </span>
+                  <span className="az-mono">{r.id}</span>
+                  {r.message && <span style={{ color: "#ef4444" }}>{r.message}</span>}
+                </div>
+              ))}
+              <p className="mt-2" style={{ color: migrationResult.ok ? "var(--teal)" : "#ef4444" }}>
+                {migrationResult.ok ? "All migrations applied successfully." : "Some migrations failed — check errors above."}
+              </p>
+            </div>
+          )}
+          <button
+            className="az-btn-primary w-full"
+            disabled={migrationLoading}
+            onClick={async () => {
+              setMigrationLoading(true);
+              setMigrationResult(null);
+              try {
+                const res = await adminFetch("/api/admin/run-migrations", { method: "POST" });
+                setMigrationResult(await res.json());
+              } catch {
+                setMigrationResult({ ok: false, results: [{ id: "network", status: "error", message: "Network error — could not reach server" }] });
+              } finally {
+                setMigrationLoading(false);
+              }
+            }}
+          >
+            {migrationLoading
+              ? <span className="flex items-center justify-center gap-2"><Spinner size="sm" /> Running…</span>
+              : "Run Migrations"}
+          </button>
+        </AdminCard>
 
         {/* DB Sync — Neon ↔ Local PostgreSQL */}
         <AdminCard title="Database Sync (Neon → Local PostgreSQL)">

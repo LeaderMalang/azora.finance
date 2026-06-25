@@ -80,13 +80,12 @@ export async function POST(req: NextRequest) {
     const match = transferLogs.find(
       (log) =>
         log.address.toLowerCase() === usdtAddr &&
-        (log.args.to as string).toLowerCase() === TREASURY_WALLET &&
-        (log.args.from as string).toLowerCase() === wallet.toLowerCase()
+        (log.args.to as string).toLowerCase() === TREASURY_WALLET
     );
 
     if (!match) {
       return NextResponse.json(
-        { error: "No USDT transfer to treasury wallet found in this transaction. Make sure you sent USDT (not BNB) to the correct address." },
+        { error: "No USDT transfer to the staking wallet found in this transaction. Make sure you sent USDT (BSC/BEP-20) to the correct address." },
         { status: 400 }
       );
     }

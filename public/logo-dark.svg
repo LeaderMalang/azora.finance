@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 44" fill="none">
+  <!-- Icon mark -->
+  <path d="M20 2 L38 38 H2 Z" stroke="#2dd4bf" stroke-width="2.5" stroke-linejoin="round" fill="none"/>
+  <path d="M20 14 L27.5 30 H12.5 Z" fill="#2dd4bf"/>
+  <!-- Wordmark (dark text for light backgrounds) -->
+  <text x="50" y="32" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="26" fill="#0f172a" letter-spacing="-0.5">Azora</text>
+</svg>

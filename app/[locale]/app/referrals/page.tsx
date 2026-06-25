@@ -117,7 +117,7 @@ export default function ReferralsPage() {
   }, []);
   const fmtRate = (r: number) => `${r.toFixed(1)}%`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://azora.finance";
+  const appUrl = typeof window !== "undefined" ? window.location.origin : "https://azora.finance";
   // Only show referral link if user has a username — wallet address prefix is not a valid referral code
   const refLink = username ? `${appUrl}?ref=${username}` : null;
 

@@ -82,11 +82,9 @@ export default function StakePage() {
     const id = setInterval(() => {
       const now = Date.now() / 1000;
       const map: Record<number, number> = {};
+      const ratePerSec = dailyRate / 100 / 86400;
       for (const s of active) {
-        const base = s.pendingRewards;
-        const ratePerSec = dailyRate / 100 / 86400;
-        const extra = s.amount * ratePerSec * (now - (new Date(s.lastClaimTime).getTime() / 1000));
-        map[s.id] = Math.max(0, base + extra - s.pendingRewards) + s.pendingRewards;
+        map[s.id] = s.amount * ratePerSec * Math.max(0, now - new Date(s.lastClaimTime).getTime() / 1000);
       }
       setLiveRewards(map);
     }, 1000);

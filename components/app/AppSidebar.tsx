@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import { useAccount, useDisconnect } from "wagmi";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useEffect, useState } from "react";
-import { NetworkSwitcher } from "./NetworkSwitcher";
 import { useSidebar } from "./SidebarContext";
 import { useAppStore } from "@/lib/store";
 
@@ -101,7 +100,6 @@ export function AppSidebar({ locale }: { locale: string }) {
       </nav>
 
       <div className="p-3 border-t space-y-2" style={{ borderColor: "var(--line)" }}>
-        <NetworkSwitcher />
         {addr ? (
           <>
             <div

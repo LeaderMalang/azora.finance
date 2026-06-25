@@ -37,26 +37,36 @@ export function ConnectModal() {
   const [registered, setRegistered]   = useState(false);
 
   // On wallet connect: check DB for existing user
-  useEffect(() => {
-    if (!isConnected || !addr) { setStep(0); return; }
-
+  const checkAccount = async (wallet: string, attempt = 1) => {
     setChecking(true);
     setCheckError(false);
-    fetch(`/api/users?wallet=${addr}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.user?.username) {
-          setUsername(d.user.username);
-          setRegistered(true);
-        } else {
-          setStep(1);
-        }
-      })
-      .catch(() => {
-        // Network error — show retry option, not registration form
-        setCheckError(true);
-      })
-      .finally(() => setChecking(false));
+    try {
+      const r = await fetch(`/api/users?wallet=${wallet}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (d.user?.username) {
+        setUsername(d.user.username);
+        setRegistered(true);
+      } else {
+        setStep(1);
+      }
+    } catch {
+      if (attempt < 3) {
+        // Auto-retry up to 3 times with increasing delay (handles cold-start crashes on cPanel)
+        setTimeout(() => checkAccount(wallet, attempt + 1), attempt * 1500);
+        return; // keep checking=true during retry
+      }
+      setCheckError(true);
+    } finally {
+      if (attempt >= 3) setChecking(false);
+      else if (attempt === 1) setChecking(false); // will be set true again on retry
+    }
+  };
+
+  useEffect(() => {
+    if (!isConnected || !addr) { setStep(0); return; }
+    checkAccount(addr);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, addr]);
 
   if (registered) return null;
@@ -147,15 +157,7 @@ export function ConnectModal() {
               <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <p className="text-sm" style={{ color: "var(--text-2)" }}>Unable to verify your account. Check your connection and try again.</p>
-            <button className="az-btn-primary px-6 py-2 text-sm" onClick={() => {
-              setCheckError(false);
-              setChecking(true);
-              fetch(`/api/users?wallet=${addr}`)
-                .then(r => r.json())
-                .then(d => { if (d.user?.username) { setUsername(d.user.username); setRegistered(true); } else { setStep(1); } })
-                .catch(() => setCheckError(true))
-                .finally(() => setChecking(false));
-            }}>Retry</button>
+            <button className="az-btn-primary px-6 py-2 text-sm" onClick={() => addr && checkAccount(addr)}>Retry</button>
             <button className="text-sm" style={{ color: "var(--muted)" }} onClick={() => { disconnect(); setStep(0); setCheckError(false); }}>
               ← Choose another wallet
             </button>
