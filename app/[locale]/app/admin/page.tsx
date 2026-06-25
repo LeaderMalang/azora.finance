@@ -1,11 +1,9 @@
 "use client";
 
 import { AppTopbar } from "@/components/app/AppTopbar";
-import { useAccount, useReadContract } from "wagmi";
-import { CONTRACTS, ERC20_ABI } from "@/lib/contracts";
+import { useAccount } from "wagmi";
 import { Spinner } from "@/components/ui/Spinner";
-import { useActiveChain } from "@/lib/hooks";
-import { formatUnits, isAddress } from "viem";
+import { isAddress } from "viem";
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/lib/store";
@@ -27,14 +25,13 @@ function AdminCard({ title, children }: { title: string; children: React.ReactNo
 export default function AdminPage() {
   const { address: addr } = useAccount();
   const { toast } = useToast();
-  const { chainId } = useActiveChain();
   const { locale } = useParams<{ locale: string }>();
 
   // Admin status from Zustand store (set by layout.tsx on wallet connect)
   const isAdminStore = useAppStore((s) => s.isAdmin);
   const [isAdmin, setIsAdminLocal] = useState<boolean | null>(null); // null = still loading
   // Pool AZR balance (platform overview)
-  const { data: poolAzrBal } = useReadContract({ address: CONTRACTS[chainId].azoraToken, abi: ERC20_ABI, functionName: "balanceOf", args: [CONTRACTS[chainId].staking], query: { enabled: true } });
+  // poolAzrBal removed — platform is custodial; on-chain contract pool is no longer displayed
 
   // Helper: add admin wallet header to all fetch calls
   const adminFetch = (url: string, opts: RequestInit = {}) =>
@@ -52,7 +49,7 @@ export default function AdminPage() {
   }, [addr, isAdminStore]);
 
   // DB stats
-  const [dbStats, setDbStats] = useState<{ userCount: number; referralTotal: string } | null>(null);
+  const [dbStats, setDbStats] = useState<{ userCount: number; referralTotal: string; totalActiveStaked: number; totalUsdtBalance: number; totalAzrBalance: number } | null>(null);
   useEffect(() => {
     if (!addr || !isAdmin) return;
     adminFetch("/api/admin/stats").then(r => r.json()).then(setDbStats).catch(() => {});
@@ -121,6 +118,11 @@ export default function AdminPage() {
   const [vwCardPage, setVwCardPage] = useState(1);
   const [baCardPage, setBaCardPage] = useState(1);
   const [ulCardPage, setUlCardPage] = useState(1);
+  const [stakeDetailPage, setStakeDetailPage] = useState(1);
+  const [claimDetailPage, setClaimDetailPage] = useState(1);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [unstaking, setUnstaking] = useState<number | null>(null);
   // DB migrations
   const [migrationLoading, setMigrationLoading] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ ok: boolean; results: { id: string; status: "ok" | "error"; message?: string }[] } | null>(null);
@@ -294,7 +296,7 @@ export default function AdminPage() {
                       <td className="py-1.5 az-mono">{u._count.virtualStakes}</td>
                       <td className="py-1.5">
                         <button className="text-[11px] px-2 py-0.5 rounded-ctl" style={{ background: "rgba(45,212,191,0.1)", color: "var(--teal)" }}
-                          onClick={() => { setUserQuery(u.walletAddress); setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${u.walletAddress}`).then(r => r.json()).then(d => { setUserResult(d); }).finally(() => setUserQueryLoading(false)); }}>
+                          onClick={() => { setUserQuery(u.walletAddress); setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${u.walletAddress}`).then(r => r.json()).then(d => { setUserResult(d); setStakeDetailPage(1); setClaimDetailPage(1); }).finally(() => setUserQueryLoading(false)); }}>
                           Detail
                         </button>
                       </td>
@@ -314,10 +316,10 @@ export default function AdminPage() {
             <div className="flex gap-2 mb-4">
               <input className="az-input flex-1" placeholder="0x... or username"
                 value={userQuery} onChange={e => setUserQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && userQuery) { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => setUserResult(d)).finally(() => setUserQueryLoading(false)); } }}
+                onKeyDown={e => { if (e.key === "Enter" && userQuery) { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); setStakeDetailPage(1); setClaimDetailPage(1); }).finally(() => setUserQueryLoading(false)); } }}
               />
               <button className="az-btn-primary px-4" disabled={userQueryLoading || !userQuery}
-                onClick={() => { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => setUserResult(d)).finally(() => setUserQueryLoading(false)); }}>
+                onClick={() => { setUserQueryLoading(true); adminFetch(`/api/admin/user-data?query=${encodeURIComponent(userQuery)}`).then(r => r.json()).then(d => { setUserResult(d); setStakeDetailPage(1); setClaimDetailPage(1); }).finally(() => setUserQueryLoading(false)); }}>
                 {userQueryLoading ? <Spinner size="sm" /> : "Lookup"}
               </button>
             </div>
@@ -336,6 +338,45 @@ export default function AdminPage() {
             );
             return (
               <div className="rounded-ctl p-4" style={{ background: "var(--bg-2)" }}>
+                {/* Delete Account */}
+                <div className="mb-3">
+                  {!deleteConfirm ? (
+                    <button
+                      className="text-xs px-3 py-1.5 rounded-ctl font-semibold"
+                      style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}
+                      onClick={() => setDeleteConfirm(true)}
+                    >
+                      Delete Account
+                    </button>
+                  ) : (
+                    <div className="rounded-ctl px-3 py-2 text-xs" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      <p className="mb-2" style={{ color: "#ef4444" }}>This will permanently delete <strong>{u.username}.azr</strong> and ALL their data. This cannot be undone.</p>
+                      <div className="flex gap-2">
+                        <button
+                          className="px-3 py-1 rounded-ctl text-xs font-semibold"
+                          style={{ background: "#ef4444", color: "#fff" }}
+                          disabled={deleting}
+                          onClick={async () => {
+                            setDeleting(true);
+                            try {
+                              const res = await adminFetch("/api/admin/delete-user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: u.id }) });
+                              const d = await res.json();
+                              if (!res.ok) { toast(d.error ?? "Delete failed", "error"); return; }
+                              toast(`Deleted ${d.deleted}.azr`);
+                              setUserResult(null);
+                              setUserQuery("");
+                              setDeleteConfirm(false);
+                            } catch { toast("Network error", "error"); }
+                            finally { setDeleting(false); }
+                          }}
+                        >
+                          {deleting ? "Deleting…" : "Confirm Delete"}
+                        </button>
+                        <button className="px-3 py-1 rounded-ctl text-xs" style={{ color: "var(--muted)" }} onClick={() => setDeleteConfirm(false)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {sectionHead("Identity")}
                 {row("User #", `#${u.seqId}`)}
                 {row("Username", `${u.username}.azr`)}
@@ -354,26 +395,65 @@ export default function AdminPage() {
 
                 {sectionHead(`Virtual Stakes (${u.virtualStakes?.length ?? 0} total · ${userResult.totalStaked?.toFixed(4)} AZR active)`)}
                 {u.virtualStakes?.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs mt-1">
-                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Amount</th><th className="text-left pb-1 font-normal">Unlocks</th><th className="text-left pb-1 font-normal">Status</th></tr></thead>
-                      <tbody>{u.virtualStakes.map((s: {id: number; amount: number; startTime: string; unlockTime: string; isActive: boolean}) => (
-                        <tr key={s.id}><td className="py-0.5 az-mono">{s.amount.toFixed(4)} AZR</td><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(s.unlockTime).toLocaleDateString()}</td><td className="py-0.5"><span style={{ color: s.isActive ? "var(--teal)" : "var(--muted)" }}>{s.isActive ? "Active" : "Ended"}</span></td></tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs mt-1">
+                        <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Amount</th><th className="text-left pb-1 font-normal">Unlocks</th><th className="text-left pb-1 font-normal">Status</th><th className="pb-1 font-normal"></th></tr></thead>
+                        <tbody>{u.virtualStakes.slice((stakeDetailPage - 1) * 10, stakeDetailPage * 10).map((s: {id: number; amount: number; startTime: string; unlockTime: string; isActive: boolean}) => (
+                          <tr key={s.id}>
+                            <td className="py-0.5 az-mono">{s.amount.toFixed(4)} AZR</td>
+                            <td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(s.unlockTime).toLocaleDateString()}</td>
+                            <td className="py-0.5"><span style={{ color: s.isActive ? "var(--teal)" : "var(--muted)" }}>{s.isActive ? "Active" : "Ended"}</span></td>
+                            <td className="py-0.5 text-right">
+                              {s.isActive && (
+                                <button
+                                  className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                  style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+                                  disabled={unstaking === s.id}
+                                  onClick={async () => {
+                                    setUnstaking(s.id);
+                                    try {
+                                      const res = await adminFetch("/api/admin/admin-unstake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stakeId: s.id }) });
+                                      const d = await res.json();
+                                      if (!res.ok) { toast(d.error ?? "Unstake failed", "error"); return; }
+                                      toast(`Unstaked · ${d.total.toFixed(4)} AZR returned to balance`);
+                                      setUserQueryLoading(true);
+                                      adminFetch(`/api/admin/user-data?query=${encodeURIComponent(u.walletAddress)}`).then(r => r.json()).then(d2 => { setUserResult(d2); setStakeDetailPage(1); }).finally(() => setUserQueryLoading(false));
+                                    } catch { toast("Network error", "error"); }
+                                    finally { setUnstaking(null); }
+                                  }}
+                                >
+                                  {unstaking === s.id ? "…" : "Unstake"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                    {u.virtualStakes.length > 10 && (
+                      <AdminPaginator page={stakeDetailPage} totalPages={Math.max(1, Math.ceil(u.virtualStakes.length / 10))} total={u.virtualStakes.length} pageSize={10}
+                        onFirst={() => setStakeDetailPage(1)} onPrev={() => setStakeDetailPage(p => p - 1)} onNext={() => setStakeDetailPage(p => p + 1)} onLast={() => setStakeDetailPage(Math.max(1, Math.ceil(u.virtualStakes.length / 10)))} />
+                    )}
+                  </>
                 ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No virtual stakes</p>}
 
                 {sectionHead(`Claim History (${userResult.claimHistory?.length ?? 0})`)}
                 {userResult.claimHistory?.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs mt-1">
-                      <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Date</th><th className="text-right pb-1 font-normal">Amount</th></tr></thead>
-                      <tbody>{userResult.claimHistory.map((c: {id: number; amount: string; claimedAt: string}) => (
-                        <tr key={c.id}><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(c.claimedAt).toLocaleString()}</td><td className="py-0.5 az-mono text-right" style={{ color: "var(--teal)" }}>+{(parseFloat(c.amount) / 1e18).toFixed(4)} AZR</td></tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs mt-1">
+                        <thead><tr style={{ color: "var(--muted)" }}><th className="text-left pb-1 font-normal">Date</th><th className="text-right pb-1 font-normal">Amount</th></tr></thead>
+                        <tbody>{userResult.claimHistory.slice((claimDetailPage - 1) * 10, claimDetailPage * 10).map((c: {id: number; amount: string; claimedAt: string}) => (
+                          <tr key={c.id}><td className="py-0.5" style={{ color: "var(--text-2)" }}>{new Date(c.claimedAt).toLocaleString()}</td><td className="py-0.5 az-mono text-right" style={{ color: "var(--teal)" }}>+{(parseFloat(c.amount) / 1e18).toFixed(4)} AZR</td></tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                    {userResult.claimHistory.length > 10 && (
+                      <AdminPaginator page={claimDetailPage} totalPages={Math.max(1, Math.ceil(userResult.claimHistory.length / 10))} total={userResult.claimHistory.length} pageSize={10}
+                        onFirst={() => setClaimDetailPage(1)} onPrev={() => setClaimDetailPage(p => p - 1)} onNext={() => setClaimDetailPage(p => p + 1)} onLast={() => setClaimDetailPage(Math.max(1, Math.ceil(userResult.claimHistory.length / 10)))} />
+                    )}
+                  </>
                 ) : <p className="text-xs" style={{ color: "var(--muted)" }}>No claims</p>}
 
                 {sectionHead(`Withdrawals (${u.withdrawals?.length ?? 0})`)}
@@ -407,14 +487,16 @@ export default function AdminPage() {
         {/* Stats overview — all values from DB except AZR Contract Pool (on-chain) */}
         <div className="az-card-glow">
           <h3 className="font-semibold mb-4 text-sm">Platform Overview</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
             {[
-              { label: "AZR Contract Pool ⛓", value: fmtNum(poolAzrBal ? parseFloat(formatUnits(poolAzrBal as bigint, 18)) : 0), unit: "AZR", color: "var(--teal)" },
-              { label: "Total Users 🗄", value: dbStats ? String(dbStats.userCount) : "…", unit: "", color: "var(--text)" },
-              { label: "Referral Paid 🗄", value: dbStats ? fmtNum(parseFloat(dbStats.referralTotal)) : "…", unit: "AZR", color: "var(--text)" },
-              { label: "Pending W/D 🗄", value: String(vwList.filter(w => w.status === 0).length), unit: "requests", color: vwList.filter(w => w.status === 0).length > 0 ? "var(--warn)" : "var(--text)" },
-              { label: "Daily Rate 🗄", value: settings ? `${settings.dailyRewardPct}%` : "…", unit: "/ day", color: "var(--teal)" },
-              { label: "Ref Rates 🗄", value: settings ? `${settings.referralRateL1}/${settings.referralRateL2}/${settings.referralRateL3}%` : "…", unit: "L1/L2/L3", color: "var(--text)" },
+              { label: "Total Stakes 🗄",    value: dbStats ? fmtNum(dbStats.totalActiveStaked) : "…",   unit: "AZR",      color: "var(--teal)" },
+              { label: "Total Users 🗄",     value: dbStats ? String(dbStats.userCount) : "…",            unit: "",         color: "var(--text)" },
+              { label: "Referral Paid 🗄",   value: dbStats ? fmtNum(parseFloat(dbStats.referralTotal)) : "…", unit: "AZR", color: "var(--text)" },
+              { label: "Pending W/D 🗄",     value: String(vwList.filter(w => w.status === 0).length),    unit: "requests", color: vwList.filter(w => w.status === 0).length > 0 ? "var(--warn)" : "var(--text)" },
+              { label: "Daily Rate 🗄",      value: settings ? `${settings.dailyRewardPct}%` : "…",       unit: "/ day",    color: "var(--teal)" },
+              { label: "Ref Rates 🗄",       value: settings ? `${settings.referralRateL1}/${settings.referralRateL2}/${settings.referralRateL3}%` : "…", unit: "L1/L2/L3", color: "var(--text)" },
+              { label: "Accounts USDT 🗄",  value: dbStats ? fmtNum(dbStats.totalUsdtBalance) : "…",     unit: "USDT",     color: "var(--teal)" },
+              { label: "Accounts AZR 🗄",   value: dbStats ? fmtNum(dbStats.totalAzrBalance) : "…",      unit: "AZR",      color: "var(--teal)" },
             ].map((s) => (
               <div key={s.label} className="rounded-ctl px-3 py-3 text-center" style={{ background: "var(--bg-2)" }}>
                 <div className="text-[10px] az-mono mb-1" style={{ color: "var(--muted)" }}>{s.label}</div>
